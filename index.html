@@ -4,20 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>四象限看板</title>
-<meta name="description" content="艾森豪威尔四象限时间管理:在一个坐标系里安排任务,数据保存在本地浏览器。">
+<meta name="description" content="艾森豪威尔四象限时间管理:一个十字坐标系安排所有任务,数据保存在本地浏览器。">
 <style>
   :root {
-    --bg: #ffffff; --sidebar: #f2f2f7; --tile: #ffffff; --text: #1c1c1e; --muted: #8e8e93;
-    --line: #e5e5ea; --hover: rgba(0,0,0,.05); --chip: #ffffff; --chip-shadow: 0 1px 3px rgba(0,0,0,.14);
-    --c1: #ff3b30; --c2: #007aff; --c3: #ff9500; --c4: #8e8e93;
-    --blue: #007aff; --purple: #af52de; --graphite: #636366; --gray: #8e8e93;
+    --bg: #ffffff; --sidebar: #f7f7f8; --text: #1c1c1e; --muted: #8e8e93;
+    --line: #e5e5ea; --axis: #c7c7cc; --hover: rgba(0,0,0,.05); --active: rgba(0,0,0,.08);
+    --chip: #ffffff; --chip-shadow: 0 1px 2px rgba(0,0,0,.08), 0 2px 8px rgba(0,0,0,.06);
+    --c1: #ff3b30; --c2: #007aff; --c3: #ff9500; --c4: #8e8e93; --blue: #007aff;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #000000; --sidebar: #1c1c1e; --tile: #2c2c2e; --text: #f2f2f7; --muted: #98989d;
-      --line: #38383a; --hover: rgba(255,255,255,.08); --chip: #2c2c2e; --chip-shadow: 0 1px 3px rgba(0,0,0,.6);
-      --c1: #ff453a; --c2: #0a84ff; --c3: #ff9f0a; --c4: #98989d;
-      --blue: #0a84ff; --purple: #bf5af2; --graphite: #8e8e93; --gray: #98989d;
+      --bg: #000000; --sidebar: #141415; --text: #f2f2f7; --muted: #98989d;
+      --line: #2c2c2e; --axis: #48484a; --hover: rgba(255,255,255,.07); --active: rgba(255,255,255,.12);
+      --chip: #1c1c1e; --chip-shadow: 0 1px 2px rgba(0,0,0,.6);
+      --c1: #ff453a; --c2: #0a84ff; --c3: #ff9f0a; --c4: #98989d; --blue: #0a84ff;
     }
   }
   * { box-sizing: border-box; }
@@ -31,105 +31,94 @@
   button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
   input { font: inherit; color: inherit; }
 
-  .app { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+  .app { display: grid; grid-template-columns: 208px 1fr; height: 100%; }
 
-  /* ---------- sidebar ---------- */
+  /* ---------- sidebar: one column ---------- */
   .sidebar {
-    background: var(--sidebar); padding: 16px 14px; overflow-y: auto;
-    display: flex; flex-direction: column; gap: 14px; border-right: 1px solid var(--line);
+    background: var(--sidebar); border-right: 1px solid var(--line);
+    padding: 18px 10px 12px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto;
   }
+  .brand { font-weight: 700; font-size: 16px; padding: 2px 10px 12px; letter-spacing: -.2px; }
   .search {
-    width: 100%; border: 0; border-radius: 9px; padding: 7px 10px 7px 30px; background: var(--hover);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: 9px 50%; outline: none;
+    width: 100%; border: 0; border-radius: 8px; padding: 6px 10px 6px 28px; margin-bottom: 8px;
+    background-color: var(--hover); outline: none; font-size: 14px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.6' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 9px 50%;
   }
-  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .tile {
-    background: var(--tile); border-radius: 12px; padding: 10px 12px; text-align: left;
-    display: flex; flex-direction: column; gap: 6px; border: 2px solid transparent;
-  }
-  .tile .row { display: flex; justify-content: space-between; align-items: center; }
-  .tile .num { font-size: 26px; font-weight: 700; line-height: 1; }
-  .tile .name { font-size: 14px; font-weight: 600; color: var(--muted); }
-  .tile.active { border-color: var(--tc); }
-  .badge {
-    width: 30px; height: 30px; border-radius: 50%; background: var(--tc);
-    display: grid; place-items: center; flex: none;
-  }
-  .badge svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-  .sec-title { font-size: 13px; font-weight: 700; color: var(--muted); padding: 0 6px; }
-  .lists { display: flex; flex-direction: column; gap: 2px; }
-  .li {
-    display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; text-align: left; width: 100%;
-  }
-  .li:hover { background: var(--hover); }
-  .li.active { background: var(--tc); color: #fff; }
-  .li .badge { width: 26px; height: 26px; }
-  .li.active .badge { background: #fff; }
-  .li.active .badge svg { stroke: var(--tc); }
-  .li .nm { flex: 1; }
-  .li .sub { color: var(--muted); font-size: 12px; }
-  .li.active .sub, .li.active .ct { color: rgba(255,255,255,.85); }
-  .li .ct { color: var(--muted); }
-  .foot { margin-top: auto; display: flex; gap: 14px; padding: 4px 6px; color: var(--muted); font-size: 13px; }
+  .nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px; border-radius: 8px; text-align: left; }
+  .nav:hover { background: var(--hover); }
+  .nav.active { background: var(--active); font-weight: 600; }
+  .nav .ico { width: 16px; height: 16px; flex: none; display: grid; place-items: center; }
+  .nav .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .nav .ico svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .nav .nm { flex: 1; }
+  .nav .ct { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .sep { height: 1px; background: var(--line); margin: 8px 10px; }
+  .foot { margin-top: auto; display: flex; gap: 14px; padding: 10px 10px 0; color: var(--muted); font-size: 13px; }
   .foot button:hover { color: var(--text); }
 
   /* ---------- main ---------- */
   .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  .mh { display: flex; align-items: center; padding: 22px 28px 8px; gap: 12px; }
-  .mh h1 { margin: 0; font-size: 30px; font-weight: 700; color: var(--vc); letter-spacing: -.5px; }
+  .mh { display: flex; align-items: center; padding: 22px 28px 6px; gap: 12px; }
+  .mh h1 { margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -.5px; }
+  .mh .sub { color: var(--muted); font-size: 14px; }
   .mh .spacer { flex: 1; }
-  .mh .ct { font-size: 28px; font-weight: 700; color: var(--vc); }
-  .mh .tx { color: var(--vc); font-size: 15px; font-weight: 500; }
+  .mh .tx { color: var(--blue); font-size: 15px; }
   .mh .plus {
     width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
-    font-size: 22px; line-height: 1; color: var(--vc); background: var(--hover);
+    font-size: 22px; line-height: 1; color: var(--blue); background: var(--hover);
   }
   #content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 
   /* ---------- plane ---------- */
-  .plane-wrap {
-    flex: 1; min-height: 0; padding: 8px 28px 24px;
-    display: grid; grid-template-columns: 22px 1fr; grid-template-rows: 1fr 22px; gap: 6px;
-  }
-  .yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: center;
-    color: var(--muted); font-size: 12px; letter-spacing: 2px; padding: 2px 0; }
-  .yaxis span { writing-mode: vertical-rl; }
-  .xaxis { grid-column: 2; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; letter-spacing: 2px; padding: 0 2px; }
-  .yaxis .mid, .xaxis .mid { font-weight: 600; }
+  .plane-wrap { flex: 1; min-height: 0; padding: 4px 28px 24px; display: flex; }
   .plane {
-    position: relative; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
-    background: var(--bg); min-height: 360px; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+    position: relative; flex: 1; min-height: 380px;
+    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+    user-select: none; -webkit-user-select: none;
   }
-  .plane .quad { position: absolute; width: 50%; height: 50%; background: color-mix(in srgb, var(--c) 7%, transparent); }
-  .plane .quad.q2 { left: 0; top: 0; }
-  .plane .quad.q1 { left: 50%; top: 0; }
-  .plane .quad.q4 { left: 0; top: 50%; }
-  .plane .quad.q3 { left: 50%; top: 50%; }
-  .plane .quad span {
-    position: absolute; font-size: 12px; font-weight: 600; color: var(--c); opacity: .85; padding: 8px 12px; pointer-events: none;
+  .axis-x, .axis-y { position: absolute; background: var(--axis); pointer-events: none; z-index: 0; }
+  .axis-x { left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; border-radius: 1px; }
+  .axis-y { top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; border-radius: 1px; }
+  .axis-x::after, .axis-y::after {
+    content: ""; position: absolute; width: 12px; height: 12px; border: solid var(--axis); border-width: 2px 2px 0 0; border-radius: 1px;
   }
-  .q2 span, .q4 span { left: 0; } .q1 span, .q3 span { right: 0; }
-  .q2 span, .q1 span { top: 0; } .q4 span, .q3 span { bottom: 0; }
-  .plane .vline, .plane .hline { position: absolute; background: var(--line); pointer-events: none; }
-  .plane .vline { left: 50%; top: 0; bottom: 0; width: 1px; }
-  .plane .hline { top: 50%; left: 0; right: 0; height: 1px; }
+  .axis-x::after { right: 0; top: -5px; transform: rotate(45deg); }
+  .axis-y::after { top: 0; left: -5px; transform: rotate(-45deg); }
+  .ax { position: absolute; font-size: 12px; color: var(--muted); pointer-events: none; letter-spacing: .5px; z-index: 0; }
+  .ax.xr { right: 4px; top: calc(50% + 10px); }
+  .ax.xl { left: 4px; top: calc(50% + 10px); }
+  .ax.yt { top: 4px; left: calc(50% + 14px); }
+  .ax.yb { bottom: 4px; left: calc(50% + 14px); }
+  .qlabel { position: absolute; font-size: 12px; font-weight: 600; color: var(--c); opacity: .75; pointer-events: none; padding: 4px 6px; z-index: 0; }
+  .qlabel.q2 { left: 0; top: 0; } .qlabel.q1 { right: 0; top: 0; }
+  .qlabel.q4 { left: 0; bottom: 0; } .qlabel.q3 { right: 0; bottom: 0; }
+
+  .qcell { position: relative; z-index: 1; display: flex; overflow-y: auto; scrollbar-width: none; padding: 34px 14px; min-height: 0; }
+  .qcell::-webkit-scrollbar { display: none; }
+  .stack { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 100%; }
+
   .chip {
-    position: absolute; transform: translate(-50%, -50%); max-width: 44%;
-    display: flex; align-items: center; gap: 7px; padding: 6px 12px 6px 8px; border-radius: 999px;
+    display: flex; align-items: center; gap: 8px; max-width: 100%; padding: 6px 14px 6px 8px; border-radius: 999px;
     background: var(--chip); box-shadow: var(--chip-shadow); cursor: grab; touch-action: none;
-    border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+    border: 1px solid color-mix(in srgb, var(--c) 40%, transparent);
+    transition: box-shadow .2s ease, border-color .2s ease;
+    will-change: transform;
   }
-  .chip.drag { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 5; }
+  .chip:hover { box-shadow: 0 2px 10px rgba(0,0,0,.14); }
+  .chip.drag {
+    position: fixed; z-index: 50; margin: 0; cursor: grabbing; transition: box-shadow .2s ease; pointer-events: auto;
+    box-shadow: 0 10px 28px rgba(0,0,0,.28);
+  }
+  .chip.settle { transition: transform .26s cubic-bezier(.2,.9,.25,1), box-shadow .26s ease; box-shadow: var(--chip-shadow); }
   .chip .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; min-width: 1ch; }
   .chip .t[contenteditable] { text-overflow: clip; user-select: text; -webkit-user-select: text; cursor: text; }
-  .t:empty::before { content: "新提醒事项"; color: var(--muted); }
-  .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 28px); color: var(--muted); font-size: 13px; pointer-events: none; text-align: center; }
+  .ph { border-radius: 999px; border: 1.5px dashed color-mix(in srgb, var(--c) 55%, transparent); background: color-mix(in srgb, var(--c) 8%, transparent); }
+  .t:empty::before { content: "新任务"; color: var(--muted); }
+  .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 36px); color: var(--muted); font-size: 13px; pointer-events: none; z-index: 2; }
 
-  .check {
-    width: 20px; height: 20px; border-radius: 50%; flex: none; border: 1.6px solid var(--c); position: relative;
-  }
-  .check:hover { background: color-mix(in srgb, var(--c) 18%, transparent); }
+  .check { width: 20px; height: 20px; border-radius: 50%; flex: none; border: 1.6px solid var(--c); position: relative; transition: background .15s; }
+  .check:hover { background: color-mix(in srgb, var(--c) 20%, transparent); }
   .done .check { background: var(--c); }
   .done .check::after {
     content: ""; position: absolute; left: 5.5px; top: 2px; width: 5px; height: 10px;
@@ -138,9 +127,7 @@
 
   /* ---------- list ---------- */
   .listview { flex: 1; overflow-y: auto; padding: 4px 28px 28px; }
-  .row-t {
-    display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line);
-  }
+  .row-t { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
   .row-t .check { margin-top: 1px; }
   .row-t .body { flex: 1; min-width: 0; }
   .row-t .t { outline: none; word-break: break-word; }
@@ -157,35 +144,25 @@
   /* ---------- narrow screens ---------- */
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-    .sidebar { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; gap: 8px; border-right: 0; border-bottom: 1px solid var(--line); align-items: center; }
-    .search, .sec-title, .foot { display: none; }
-    .tiles, .lists { display: contents; }
-    .tile, .li { width: auto; flex: none; flex-direction: row; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; }
-    .tile .row { gap: 8px; }
-    .tile .num { display: none; }
-    .tile .name, .li .nm { font-size: 14px; color: inherit; white-space: nowrap; }
-    .tile .badge, .li .badge { width: 22px; height: 22px; }
-    .tile .badge svg { width: 12px; height: 12px; }
-    .li .sub { display: none; }
-    .tile.active { background: var(--tc); color: #fff; border-color: transparent; }
-    .tile.active .name { color: #fff; }
-    .tile.active .badge { background: #fff; }
-    .tile.active .badge svg { stroke: var(--tc); }
-    .mh { padding: 14px 16px 6px; }
+    .sidebar { flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; padding: 8px 10px; gap: 4px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .brand, .search, .sep, .foot { display: none; }
+    .nav { width: auto; flex: none; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
+    .nav .ct { display: none; }
+    .mh { padding: 14px 16px 4px; }
     .mh h1 { font-size: 24px; }
-    .plane-wrap { padding: 8px 12px 16px; }
+    .plane-wrap { padding: 4px 12px 16px; }
+    .plane { min-height: 480px; }
+    .qcell { padding: 30px 6px; }
     .listview { padding: 4px 16px 24px; }
-    .plane { min-height: 420px; }
   }
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
+    <div class="brand">四象限</div>
     <input class="search" id="search" type="search" placeholder="搜索" autocomplete="off">
-    <div class="tiles" id="tiles"></div>
-    <div class="sec-title">象限清单</div>
-    <nav class="lists" id="lists"></nav>
+    <nav id="nav" style="display:contents"></nav>
     <div class="foot">
       <button id="exportBtn" type="button">导出</button>
       <button id="importBtn" type="button">导入</button>
@@ -195,9 +172,9 @@
   <main class="main">
     <header class="mh">
       <h1 id="title"></h1>
+      <span class="sub" id="sub"></span>
       <span class="spacer"></span>
-      <button class="tx" id="clearBtn" type="button" hidden></button>
-      <span class="ct" id="count"></span>
+      <button class="tx" id="clearBtn" type="button" hidden>清除全部</button>
       <button class="plus" id="addBtn" type="button" title="新建" aria-label="新建">+</button>
     </header>
     <section id="content"></section>
@@ -206,58 +183,38 @@
 
 <script>
 const QUADS = {
-  q1: { name: '重要且紧急', hint: '立刻做', color: 'var(--c1)', icon: 'flame' },
-  q2: { name: '重要不紧急', hint: '计划做', color: 'var(--c2)', icon: 'calendar' },
-  q3: { name: '紧急不重要', hint: '委派 / 快速处理', color: 'var(--c3)', icon: 'bolt' },
-  q4: { name: '不重要不紧急', hint: '少做 / 删除', color: 'var(--c4)', icon: 'minus' },
+  q1: { name: '重要且紧急',   short: '立刻做', color: 'var(--c1)' },
+  q2: { name: '重要不紧急',   short: '计划做', color: 'var(--c2)' },
+  q3: { name: '紧急不重要',   short: '委派',   color: 'var(--c3)' },
+  q4: { name: '不重要不紧急', short: '少做',   color: 'var(--c4)' },
 };
-const VIEWS = {
-  plane:     { name: '四象限', color: 'var(--blue)',     icon: 'plane' },
-  all:       { name: '全部',   color: 'var(--graphite)', icon: 'list' },
-  important: { name: '重要',   color: 'var(--purple)',   icon: 'star' },
-  done:      { name: '已完成', color: 'var(--gray)',     icon: 'check' },
-};
-const ICONS = {
-  plane: '<path d="M12 3v18M3 12h18"/>',
-  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
-  star: '<path d="M12 4v10M12 19v.01"/>',
-  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
-  flame: '<path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .5 1.5 1.5 2 2 2-.5-3 0-6 1-8z"/>',
-  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
-  bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
-  minus: '<path d="M6 12h12"/>',
-};
-const svg = k => `<svg viewBox="0 0 24 24">${ICONS[k]}</svg>`;
+const CROSS = '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>';
+const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
-const KEY = 'quadrant-board:v2';
-const OLD_KEY = 'quadrant-board:v1';
+const KEY = 'quadrant-board:v3';
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const rnd = (a, b) => a + Math.random() * (b - a);
 
-function randomPos(q) {
-  const urgent = q === 'q1' || q === 'q3', important = q === 'q1' || q === 'q2';
-  return { x: urgent ? rnd(.58, .88) : rnd(.12, .42), y: important ? rnd(.14, .42) : rnd(.58, .86) };
-}
-function quadOf(t) {
-  const important = t.y < .5, urgent = t.x >= .5;
-  return important ? (urgent ? 'q1' : 'q2') : (urgent ? 'q3' : 'q4');
-}
+/* ---------- data ---------- */
 function normalize(raw) {
   if (!raw || typeof raw.text !== 'string') return null;
-  const t = { id: raw.id || uid(), text: raw.text, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null };
-  if (typeof raw.x === 'number' && typeof raw.y === 'number') { t.x = clamp(raw.x, 0.05, 0.95); t.y = clamp(raw.y, 0.05, 0.95); }
-  else {
-    if (!QUADS[raw.q]) return null;
-    Object.assign(t, randomPos(raw.q));
+  let q = raw.q;
+  if (!QUADS[q]) {
+    if (typeof raw.x === 'number' && typeof raw.y === 'number') {
+      const imp = raw.y < .5, urg = raw.x >= .5;
+      q = imp ? (urg ? 'q1' : 'q2') : (urg ? 'q3' : 'q4');
+    } else return null;
   }
-  return t;
+  return { id: raw.id || uid(), text: raw.text, q, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null };
 }
 function load() {
-  for (const k of [KEY, OLD_KEY]) {
+  for (const k of [KEY, 'quadrant-board:v2', 'quadrant-board:v1']) {
     try {
       const v = JSON.parse(localStorage.getItem(k));
-      if (Array.isArray(v)) return v.map(normalize).filter(Boolean);
+      if (Array.isArray(v)) {
+        if (k.endsWith('v2')) v.sort((a, b) => (a.y || 0) - (b.y || 0)); // keep old vertical order
+        return v.map(normalize).filter(Boolean);
+      }
     } catch (e) {}
   }
   return [];
@@ -266,7 +223,7 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catc
 
 let tasks = load();
 let view = 'plane';
-try { const v = localStorage.getItem('quadrant-board:view'); if (v && (VIEWS[v] || QUADS[v])) view = v; } catch (e) {}
+try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || QUADS[v]) view = v; } catch (e) {}
 let query = '';
 let pendingEdit = null;
 let pendingFocusAdd = false;
@@ -283,33 +240,41 @@ function h(tag, props, ...kids) {
   for (const c of kids.flat()) if (c != null) el.append(c);
   return el;
 }
+const open = () => tasks.filter(t => !t.done);
 
-/* ---------- data ops ---------- */
-function addTask(q, text, pos) {
-  const p = pos || randomPos(q);
-  const t = { id: uid(), text: text || '', x: p.x, y: p.y, done: false, created: Date.now(), doneAt: null };
+function addTask(q, text) {
+  const t = { id: uid(), text: text || '', q, done: false, created: Date.now(), doneAt: null };
   tasks.push(t);
   return t;
 }
-function toggleDone(t) {
-  t.done = !t.done; t.doneAt = t.done ? Date.now() : null;
-  save(); render();
-}
+function toggleDone(t) { t.done = !t.done; t.doneAt = t.done ? Date.now() : null; save(); render(); }
 function removeTask(t) { tasks = tasks.filter(x => x !== t); save(); render(); }
 
-function commitText(t, el) {
-  if (!tasks.includes(t)) return;
-  const v = el.textContent.trim();
-  el.removeAttribute('contenteditable');
-  if (!v) { removeTask(t); return; }
-  if (v !== t.text) { t.text = v; save(); render(); }
+/* move task t into quadrant q at position idx among that quadrant's open tasks */
+function moveTask(t, q, idx) {
+  const rest = tasks.filter(x => x !== t && !x.done && x.q === q);
+  tasks = tasks.filter(x => x !== t);
+  t.q = q;
+  if (idx < rest.length) tasks.splice(tasks.indexOf(rest[idx]), 0, t);
+  else if (rest.length) tasks.splice(tasks.indexOf(rest[rest.length - 1]) + 1, 0, t);
+  else tasks.push(t);
+  save();
 }
+
+/* ---------- editing ---------- */
 const PLAIN = (() => { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only'; })();
 function startEdit(el) {
   el.contentEditable = PLAIN ? 'plaintext-only' : 'true';
   el.focus();
   const r = document.createRange(); r.selectNodeContents(el);
   const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function commitText(t, el) {
+  if (!tasks.includes(t)) return;
+  const v = el.textContent.trim();
+  el.removeAttribute('contenteditable');
+  if (!v) { removeTask(t); return; }
+  if (v !== t.text) { t.text = v; save(); render(); }
 }
 function bindEditing(t, el) {
   el.addEventListener('blur', () => commitText(t, el));
@@ -318,68 +283,79 @@ function bindEditing(t, el) {
   });
 }
 
-/* ---------- selectors ---------- */
-const open = () => tasks.filter(t => !t.done);
-function tasksFor(v) {
-  if (query) return tasks.filter(t => t.text.toLowerCase().includes(query.toLowerCase()));
-  if (v === 'done') return tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
-  if (v === 'plane' || v === 'all') return open();
-  if (v === 'important') return open().filter(t => t.y < .5);
-  return open().filter(t => quadOf(t) === v);
+/* ---------- FLIP animation ---------- */
+function snapshot(root, skip) {
+  const m = new Map();
+  root.querySelectorAll('[data-id]').forEach(el => { if (el !== skip) m.set(el.dataset.id, el.getBoundingClientRect()); });
+  return m;
+}
+function flip(root, first, skip) {
+  const moving = [];
+  root.querySelectorAll('[data-id]').forEach(el => {
+    if (el === skip) return;
+    const f = first.get(el.dataset.id);
+    if (!f) return;
+    const l = el.getBoundingClientRect();
+    const dx = f.left - l.left, dy = f.top - l.top;
+    if (Math.abs(dx) < .5 && Math.abs(dy) < .5) return;
+    el.style.transition = 'none';
+    el.style.transform = `translate(${dx}px,${dy}px)`;
+    moving.push(el);
+  });
+  if (!moving.length) return;
+  root.getBoundingClientRect(); // force reflow
+  requestAnimationFrame(() => {
+    for (const el of moving) {
+      el.style.transition = 'transform .3s cubic-bezier(.2,.9,.25,1)';
+      el.style.transform = '';
+      const clean = () => { el.style.transition = ''; el.removeEventListener('transitionend', clean); };
+      el.addEventListener('transitionend', clean);
+    }
+  });
 }
 
 /* ---------- render ---------- */
+let lastView = null;
 function render() {
-  renderSidebar();
+  const content = $('content');
+  const first = (view === lastView && view === 'plane' && !query) ? snapshot(content) : null;
+  renderNav();
   renderMain();
+  if (first) flip(content, first);
+  lastView = view;
   try { localStorage.setItem('quadrant-board:view', view); } catch (e) {}
 }
 
-function renderSidebar() {
-  const counts = {
-    plane: open().length, all: open().length,
-    important: open().filter(t => t.y < .5).length,
-    done: tasks.filter(t => t.done).length,
-  };
-  for (const q of Object.keys(QUADS)) counts[q] = open().filter(t => quadOf(t) === q).length;
-
-  const tiles = $('tiles'); tiles.innerHTML = '';
-  for (const [id, v] of Object.entries(VIEWS)) {
-    tiles.append(h('button', {
-      class: 'tile' + (view === id && !query ? ' active' : ''), style: `--tc:${v.color}`, type: 'button',
-      onclick: () => setView(id),
-    },
-      h('div', { class: 'row' }, h('span', { class: 'badge', html: svg(v.icon) }), h('span', { class: 'num' }, String(counts[id]))),
-      h('span', { class: 'name' }, v.name)));
-  }
-  const lists = $('lists'); lists.innerHTML = '';
+function renderNav() {
+  const nav = $('nav'); nav.innerHTML = '';
+  const item = (id, icon, name, count, color, title) => h('button', {
+    class: 'nav' + (view === id && !query ? ' active' : ''), type: 'button', title: title || name,
+    style: color ? `--c:${color}` : '', onclick: () => setView(id),
+  }, h('span', { class: 'ico', html: icon }), h('span', { class: 'nm' }, name), h('span', { class: 'ct' }, count ? String(count) : ''));
+  nav.append(item('plane', CROSS, '四象限', open().length));
+  nav.append(h('div', { class: 'sep' }));
   for (const [id, q] of Object.entries(QUADS)) {
-    lists.append(h('button', {
-      class: 'li' + (view === id && !query ? ' active' : ''), style: `--tc:${q.color}`, type: 'button',
-      onclick: () => setView(id),
-    },
-      h('span', { class: 'badge', html: svg(q.icon) }),
-      h('span', { class: 'nm' }, q.name, ' ', h('span', { class: 'sub' }, q.hint)),
-      h('span', { class: 'ct' }, String(counts[id]))));
+    nav.append(item(id, '<span class="dot"></span>', q.short, open().filter(t => t.q === id).length, q.color, q.name));
   }
+  nav.append(h('div', { class: 'sep' }));
+  nav.append(item('done', CHECK, '已完成', tasks.filter(t => t.done).length));
 }
 
-function setView(v) {
-  view = v; query = ''; $('search').value = '';
-  render();
+function setView(v) { view = v; query = ''; $('search').value = ''; render(); }
+
+function tasksFor() {
+  if (query) return tasks.filter(t => t.text.toLowerCase().includes(query.toLowerCase()));
+  if (view === 'done') return tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  if (view === 'plane') return open();
+  return open().filter(t => t.q === view);
 }
 
 function renderMain() {
   const searching = !!query;
-  const meta = searching ? { name: '搜索结果', color: 'var(--blue)' } : (VIEWS[view] || QUADS[view]);
-  const list = tasksFor(view);
-  const title = $('title');
-  title.textContent = meta.name;
-  document.querySelector('.mh').style.setProperty('--vc', meta.color);
-  $('count').textContent = String(list.length);
-  const clear = $('clearBtn');
-  clear.hidden = !(view === 'done' && !searching && list.length);
-  clear.textContent = '清除全部';
+  const list = tasksFor();
+  $('title').textContent = searching ? '搜索结果' : view === 'plane' ? '四象限' : view === 'done' ? '已完成' : QUADS[view].name;
+  $('sub').textContent = searching || view === 'plane' || view === 'done' ? `${list.length} 项` : `${QUADS[view].short} · ${list.length} 项`;
+  $('clearBtn').hidden = !(view === 'done' && !searching && list.length);
   $('addBtn').hidden = searching || view === 'done';
 
   const content = $('content'); content.innerHTML = '';
@@ -398,31 +374,35 @@ function renderMain() {
 }
 
 /* ---- plane ---- */
+function quadAt(plane, px, py) {
+  const r = plane.getBoundingClientRect();
+  const urgent = px >= r.left + r.width / 2, important = py < r.top + r.height / 2;
+  return important ? (urgent ? 'q1' : 'q2') : (urgent ? 'q3' : 'q4');
+}
+
 function renderPlane(list) {
-  const wrap = h('div', { class: 'plane-wrap' });
-  wrap.append(h('div', { class: 'yaxis' }, h('span', {}, '重要'), h('span', { class: 'mid' }, '重要程度'), h('span', {}, '不重要')));
   const plane = h('div', { class: 'plane' });
+  plane.append(h('div', { class: 'axis-x' }), h('div', { class: 'axis-y' }));
+  plane.append(
+    h('span', { class: 'ax xr' }, '紧急'), h('span', { class: 'ax xl' }, '不紧急'),
+    h('span', { class: 'ax yt' }, '重要'), h('span', { class: 'ax yb' }, '不重要'));
   for (const id of ['q2', 'q1', 'q4', 'q3']) {
-    plane.append(h('div', { class: 'quad ' + id, style: `--c:${QUADS[id].color}` },
-      h('span', {}, `${QUADS[id].name} · ${QUADS[id].hint}`)));
+    plane.append(h('span', { class: 'qlabel ' + id, style: `--c:${QUADS[id].color}` }, `${QUADS[id].name} · ${QUADS[id].short}`));
+    const stack = h('div', { class: 'stack' });
+    for (const t of list.filter(t => t.q === id)) stack.append(chipEl(t, plane));
+    plane.append(h('div', { class: 'qcell', 'data-q': id }, stack));
   }
-  plane.append(h('div', { class: 'vline' }), h('div', { class: 'hline' }));
-  if (!list.length) plane.append(h('div', { class: 'hint' }, '双击坐标系任意位置添加任务'));
-  for (const t of list) plane.append(chipEl(t, plane));
+  if (!list.length) plane.append(h('div', { class: 'hint' }, '双击任意位置添加任务'));
   plane.addEventListener('dblclick', e => {
     if (e.target.closest('.chip')) return;
-    const r = plane.getBoundingClientRect();
-    const t = addTask(null, '', { x: clamp((e.clientX - r.left) / r.width, .06, .94), y: clamp((e.clientY - r.top) / r.height, .06, .94) });
+    const t = addTask(quadAt(plane, e.clientX, e.clientY), '');
     pendingEdit = t.id; render();
   });
-  wrap.append(plane);
-  wrap.append(h('div', { class: 'xaxis' }, h('span', {}, '不紧急'), h('span', { class: 'mid' }, '紧急程度'), h('span', {}, '紧急')));
-  return wrap;
+  return h('div', { class: 'plane-wrap' }, plane);
 }
 
 function chipEl(t, plane) {
-  const q = quadOf(t);
-  const chip = h('div', { class: 'chip' + (t.done ? ' done' : ''), 'data-id': t.id, style: `left:${t.x * 100}%;top:${t.y * 100}%;--c:${QUADS[q].color}` });
+  const chip = h('div', { class: 'chip' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` });
   const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成' });
   check.addEventListener('pointerdown', e => e.stopPropagation());
   check.addEventListener('click', e => { e.stopPropagation(); toggleDone(t); });
@@ -431,28 +411,77 @@ function chipEl(t, plane) {
   text.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(text); });
   chip.append(check, text);
 
-  let start = null;
+  let st = null, raf = 0;
+
+  function begin() {
+    const r = chip.getBoundingClientRect();
+    const ph = h('div', { class: 'ph', style: `width:${r.width}px;height:${r.height}px;--c:${QUADS[t.q].color}` });
+    chip.parentNode.insertBefore(ph, chip);
+    chip.style.width = r.width + 'px';
+    chip.style.left = r.left + 'px';
+    chip.style.top = r.top + 'px';
+    chip.classList.add('drag');
+    Object.assign(st, { active: true, ph, left: r.left, top: r.top, q: t.q });
+  }
+
+  function retarget(px, py) {
+    const rect = plane.getBoundingClientRect();
+    const q = quadAt(plane, clamp(px, rect.left, rect.right - 1), clamp(py, rect.top, rect.bottom - 1));
+    const stack = plane.querySelector(`.qcell[data-q="${q}"] .stack`);
+    const kids = [...stack.children].filter(c => c !== st.ph && c !== chip && c.dataset.id);
+    const idx = kids.filter(k => { const r = k.getBoundingClientRect(); return r.top + r.height / 2 < py; }).length;
+    const cur = st.ph.parentNode === stack ? [...stack.children].filter(c => c === st.ph || kids.includes(c)).indexOf(st.ph) : -1;
+    if (cur === idx) return;
+    const first = snapshot(plane, chip);
+    stack.insertBefore(st.ph, kids[idx] || null);
+    st.ph.style.setProperty('--c', QUADS[q].color);
+    chip.style.setProperty('--c', QUADS[q].color);
+    st.q = q;
+    flip(plane, first, chip);
+  }
+
   chip.addEventListener('pointerdown', e => {
     if (text.isContentEditable || e.button !== 0) return;
-    const r = plane.getBoundingClientRect();
-    start = { cx: e.clientX, cy: e.clientY, x: t.x, y: t.y, w: r.width, h: r.height, moved: false };
+    st = { sx: e.clientX, sy: e.clientY, active: false, x: e.clientX, y: e.clientY };
     chip.setPointerCapture(e.pointerId);
   });
   chip.addEventListener('pointermove', e => {
-    if (!start) return;
-    const dx = e.clientX - start.cx, dy = e.clientY - start.cy;
-    if (!start.moved && Math.hypot(dx, dy) < 4) return;
-    start.moved = true; chip.classList.add('drag');
-    t.x = clamp(start.x + dx / start.w, .04, .96);
-    t.y = clamp(start.y + dy / start.h, .05, .95);
-    chip.style.left = t.x * 100 + '%'; chip.style.top = t.y * 100 + '%';
-    chip.style.setProperty('--c', QUADS[quadOf(t)].color);
+    if (!st) return;
+    st.x = e.clientX; st.y = e.clientY;
+    if (!st.active) {
+      if (Math.hypot(st.x - st.sx, st.y - st.sy) < 5) return;
+      begin();
+    }
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!st || !st.active || st.settling) return;
+      chip.style.transform = `translate3d(${st.x - st.sx}px,${st.y - st.sy}px,0)`;
+      retarget(st.x, st.y);
+    });
   });
   const end = () => {
-    if (!start) return;
-    const moved = start.moved; start = null;
-    chip.classList.remove('drag');
-    if (moved) { save(); render(); }
+    if (!st) return;
+    const s = st;
+    if (!s.active) { st = null; return; }
+    if (s.settling) return;
+    s.settling = true;
+    if (raf) { cancelAnimationFrame(raf); raf = 0; }
+    const p = s.ph.getBoundingClientRect();
+    chip.classList.add('settle');
+    chip.style.transform = `translate3d(${p.left - s.left}px,${p.top - s.top}px,0)`;
+    let finished = false;
+    const finish = () => {
+      if (finished) return; finished = true;
+      const stack = s.ph.parentNode;
+      const kids = [...stack.children].filter(c => c !== s.ph && c !== chip && c.dataset.id);
+      const idx = kids.filter(k => k.compareDocumentPosition(s.ph) & Node.DOCUMENT_POSITION_FOLLOWING).length;
+      st = null;
+      moveTask(t, s.q, idx);
+      render();
+    };
+    chip.addEventListener('transitionend', e => { if (e.propertyName === 'transform') finish(); });
+    setTimeout(finish, 320);
   };
   chip.addEventListener('pointerup', end);
   chip.addEventListener('pointercancel', end);
@@ -462,21 +491,20 @@ function chipEl(t, plane) {
 /* ---- list ---- */
 function renderList(list, searching) {
   const box = h('div', { class: 'listview' });
-  const showTag = view === 'all' || view === 'important' || view === 'done' || searching;
+  const showTag = view === 'done' || searching;
   for (const t of list) {
-    const q = quadOf(t);
     const text = h('div', { class: 't', contenteditable: PLAIN ? 'plaintext-only' : 'true' }, t.text);
     bindEditing(t, text);
     const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成', onclick: () => toggleDone(t) });
-    box.append(h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[q].color}` },
+    box.append(h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` },
       check,
-      h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, QUADS[q].name) : null),
+      h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, QUADS[t.q].name) : null),
       h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
   }
   if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : '这里还没有任务')));
   if (!searching && view !== 'done') {
     const q = QUADS[view] ? view : 'q2';
-    const input = h('input', { placeholder: '新提醒事项', autocomplete: 'off' });
+    const input = h('input', { placeholder: '新任务', autocomplete: 'off' });
     input.addEventListener('keydown', e => {
       if (e.key !== 'Enter' || e.isComposing) return;
       const v = input.value.trim();
@@ -491,11 +519,8 @@ function renderList(list, searching) {
 /* ---------- global controls ---------- */
 $('search').addEventListener('input', e => { query = e.target.value.trim(); render(); });
 $('addBtn').addEventListener('click', () => {
-  if (view === 'plane') {
-    const t = addTask('q2', ''); pendingEdit = t.id; render();
-  } else {
-    pendingFocusAdd = true; render();
-  }
+  if (view === 'plane') { const t = addTask('q2', ''); pendingEdit = t.id; render(); }
+  else { pendingFocusAdd = true; render(); }
 });
 $('clearBtn').addEventListener('click', () => {
   const n = tasks.filter(t => t.done).length;
