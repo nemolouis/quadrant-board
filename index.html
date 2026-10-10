@@ -4,215 +4,525 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>四象限看板</title>
-<meta name="description" content="艾森豪威尔四象限时间管理看板,数据保存在本地浏览器。">
+<meta name="description" content="艾森豪威尔四象限时间管理:在一个坐标系里安排任务,数据保存在本地浏览器。">
 <style>
   :root {
-    --bg: #f5f5f4; --panel: #ffffff; --text: #1c1917; --muted: #78716c; --border: #e7e5e4;
-    --c1: #dc2626; --c2: #2563eb; --c3: #d97706; --c4: #6b7280;
-    --card: #fafaf9; --shadow: 0 1px 2px rgba(0,0,0,.06);
+    --bg: #ffffff; --sidebar: #f2f2f7; --tile: #ffffff; --text: #1c1c1e; --muted: #8e8e93;
+    --line: #e5e5ea; --hover: rgba(0,0,0,.05); --chip: #ffffff; --chip-shadow: 0 1px 3px rgba(0,0,0,.14);
+    --c1: #ff3b30; --c2: #007aff; --c3: #ff9500; --c4: #8e8e93;
+    --blue: #007aff; --purple: #af52de; --graphite: #636366; --gray: #8e8e93;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #151413; --panel: #1f1d1c; --text: #f5f5f4; --muted: #a8a29e; --border: #33302e;
-      --c1: #f87171; --c2: #60a5fa; --c3: #fbbf24; --c4: #9ca3af;
-      --card: #292524; --shadow: none;
+      --bg: #000000; --sidebar: #1c1c1e; --tile: #2c2c2e; --text: #f2f2f7; --muted: #98989d;
+      --line: #38383a; --hover: rgba(255,255,255,.08); --chip: #2c2c2e; --chip-shadow: 0 1px 3px rgba(0,0,0,.6);
+      --c1: #ff453a; --c2: #0a84ff; --c3: #ff9f0a; --c4: #98989d;
+      --blue: #0a84ff; --purple: #bf5af2; --graphite: #8e8e93; --gray: #98989d;
     }
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; }
   body {
     background: var(--bg); color: var(--text);
-    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "PingFang SC", "Segoe UI", sans-serif;
-    display: flex; flex-direction: column;
+    font: 15px/1.45 -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  header {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    padding: 14px 16px; border-bottom: 1px solid var(--border); background: var(--panel);
+  [hidden] { display: none !important; }
+  button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; padding: 0; }
+  input { font: inherit; color: inherit; }
+
+  .app { display: grid; grid-template-columns: 280px 1fr; height: 100%; }
+
+  /* ---------- sidebar ---------- */
+  .sidebar {
+    background: var(--sidebar); padding: 16px 14px; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 14px; border-right: 1px solid var(--line);
   }
-  h1 { font-size: 18px; margin: 0; margin-right: auto; }
-  .add { display: flex; gap: 8px; flex: 1 1 360px; max-width: 560px; }
-  .add input, .add select {
-    font: inherit; color: inherit; background: var(--card);
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  .search {
+    width: 100%; border: 0; border-radius: 9px; padding: 7px 10px 7px 30px; background: var(--hover);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238e8e93' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 9px 50%; outline: none;
   }
-  .add input { flex: 1; min-width: 0; }
-  button {
-    font: inherit; color: inherit; background: var(--card); cursor: pointer;
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .tile {
+    background: var(--tile); border-radius: 12px; padding: 10px 12px; text-align: left;
+    display: flex; flex-direction: column; gap: 6px; border: 2px solid transparent;
   }
-  button:hover { border-color: var(--muted); }
-  button.primary { background: var(--text); color: var(--bg); border-color: var(--text); }
-  .tools { display: flex; gap: 8px; }
-  main {
-    flex: 1; min-height: 0; padding: 16px;
-    display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 12px;
+  .tile .row { display: flex; justify-content: space-between; align-items: center; }
+  .tile .num { font-size: 26px; font-weight: 700; line-height: 1; }
+  .tile .name { font-size: 14px; font-weight: 600; color: var(--muted); }
+  .tile.active { border-color: var(--tc); }
+  .badge {
+    width: 30px; height: 30px; border-radius: 50%; background: var(--tc);
+    display: grid; place-items: center; flex: none;
   }
-  .quad {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
-    border-top: 4px solid var(--c); display: flex; flex-direction: column; min-height: 0;
-    box-shadow: var(--shadow);
+  .badge svg { width: 16px; height: 16px; stroke: #fff; fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .sec-title { font-size: 13px; font-weight: 700; color: var(--muted); padding: 0 6px; }
+  .lists { display: flex; flex-direction: column; gap: 2px; }
+  .li {
+    display: flex; align-items: center; gap: 10px; padding: 7px 8px; border-radius: 9px; text-align: left; width: 100%;
   }
-  .quad.over { outline: 2px dashed var(--c); outline-offset: -4px; }
-  .quad h2 { margin: 0; padding: 12px 14px 4px; font-size: 15px; display: flex; gap: 8px; align-items: baseline; }
-  .quad h2 small { color: var(--muted); font-weight: 400; font-size: 12px; }
-  .quad h2 .count { margin-left: auto; color: var(--muted); font-weight: 400; font-size: 12px; }
-  .list { flex: 1; overflow-y: auto; padding: 8px 12px 12px; display: flex; flex-direction: column; gap: 6px; }
-  .task {
-    display: flex; align-items: flex-start; gap: 8px; background: var(--card);
-    border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; cursor: grab;
+  .li:hover { background: var(--hover); }
+  .li.active { background: var(--tc); color: #fff; }
+  .li .badge { width: 26px; height: 26px; }
+  .li.active .badge { background: #fff; }
+  .li.active .badge svg { stroke: var(--tc); }
+  .li .nm { flex: 1; }
+  .li .sub { color: var(--muted); font-size: 12px; }
+  .li.active .sub, .li.active .ct { color: rgba(255,255,255,.85); }
+  .li .ct { color: var(--muted); }
+  .foot { margin-top: auto; display: flex; gap: 14px; padding: 4px 6px; color: var(--muted); font-size: 13px; }
+  .foot button:hover { color: var(--text); }
+
+  /* ---------- main ---------- */
+  .main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .mh { display: flex; align-items: center; padding: 22px 28px 8px; gap: 12px; }
+  .mh h1 { margin: 0; font-size: 30px; font-weight: 700; color: var(--vc); letter-spacing: -.5px; }
+  .mh .spacer { flex: 1; }
+  .mh .ct { font-size: 28px; font-weight: 700; color: var(--vc); }
+  .mh .tx { color: var(--vc); font-size: 15px; font-weight: 500; }
+  .mh .plus {
+    width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 22px; line-height: 1; color: var(--vc); background: var(--hover);
   }
-  .task.dragging { opacity: .4; }
-  .task input[type=checkbox] { margin-top: 4px; accent-color: var(--c); }
-  .task .t { flex: 1; word-break: break-word; outline: none; }
-  .task.done .t { text-decoration: line-through; color: var(--muted); }
-  .task .x { border: none; background: none; padding: 0 4px; color: var(--muted); font-size: 18px; line-height: 1.2; }
-  .task .x:hover { color: var(--c1); }
-  .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 16px 0; }
-  @media (max-width: 720px) {
-    main { grid-template-columns: 1fr; grid-template-rows: none; }
-    .quad { min-height: 220px; }
-    body { height: auto; }
+  #content { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+  /* ---------- plane ---------- */
+  .plane-wrap {
+    flex: 1; min-height: 0; padding: 8px 28px 24px;
+    display: grid; grid-template-columns: 22px 1fr; grid-template-rows: 1fr 22px; gap: 6px;
+  }
+  .yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: center;
+    color: var(--muted); font-size: 12px; letter-spacing: 2px; padding: 2px 0; }
+  .yaxis span { writing-mode: vertical-rl; }
+  .xaxis { grid-column: 2; display: flex; justify-content: space-between; color: var(--muted); font-size: 12px; letter-spacing: 2px; padding: 0 2px; }
+  .yaxis .mid, .xaxis .mid { font-weight: 600; }
+  .plane {
+    position: relative; border: 1px solid var(--line); border-radius: 14px; overflow: hidden;
+    background: var(--bg); min-height: 360px; touch-action: manipulation; user-select: none; -webkit-user-select: none;
+  }
+  .plane .quad { position: absolute; width: 50%; height: 50%; background: color-mix(in srgb, var(--c) 7%, transparent); }
+  .plane .quad.q2 { left: 0; top: 0; }
+  .plane .quad.q1 { left: 50%; top: 0; }
+  .plane .quad.q4 { left: 0; top: 50%; }
+  .plane .quad.q3 { left: 50%; top: 50%; }
+  .plane .quad span {
+    position: absolute; font-size: 12px; font-weight: 600; color: var(--c); opacity: .85; padding: 8px 12px; pointer-events: none;
+  }
+  .q2 span, .q4 span { left: 0; } .q1 span, .q3 span { right: 0; }
+  .q2 span, .q1 span { top: 0; } .q4 span, .q3 span { bottom: 0; }
+  .plane .vline, .plane .hline { position: absolute; background: var(--line); pointer-events: none; }
+  .plane .vline { left: 50%; top: 0; bottom: 0; width: 1px; }
+  .plane .hline { top: 50%; left: 0; right: 0; height: 1px; }
+  .chip {
+    position: absolute; transform: translate(-50%, -50%); max-width: 44%;
+    display: flex; align-items: center; gap: 7px; padding: 6px 12px 6px 8px; border-radius: 999px;
+    background: var(--chip); box-shadow: var(--chip-shadow); cursor: grab; touch-action: none;
+    border: 1px solid color-mix(in srgb, var(--c) 35%, transparent);
+  }
+  .chip.drag { cursor: grabbing; box-shadow: 0 6px 18px rgba(0,0,0,.25); z-index: 5; }
+  .chip .t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; min-width: 1ch; }
+  .chip .t[contenteditable] { text-overflow: clip; user-select: text; -webkit-user-select: text; cursor: text; }
+  .t:empty::before { content: "新提醒事项"; color: var(--muted); }
+  .hint { position: absolute; left: 50%; top: 50%; transform: translate(-50%, 28px); color: var(--muted); font-size: 13px; pointer-events: none; text-align: center; }
+
+  .check {
+    width: 20px; height: 20px; border-radius: 50%; flex: none; border: 1.6px solid var(--c); position: relative;
+  }
+  .check:hover { background: color-mix(in srgb, var(--c) 18%, transparent); }
+  .done .check { background: var(--c); }
+  .done .check::after {
+    content: ""; position: absolute; left: 5.5px; top: 2px; width: 5px; height: 10px;
+    border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg);
+  }
+
+  /* ---------- list ---------- */
+  .listview { flex: 1; overflow-y: auto; padding: 4px 28px 28px; }
+  .row-t {
+    display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line);
+  }
+  .row-t .check { margin-top: 1px; }
+  .row-t .body { flex: 1; min-width: 0; }
+  .row-t .t { outline: none; word-break: break-word; }
+  .row-t.done .t { color: var(--muted); text-decoration: line-through; }
+  .row-t .tag { font-size: 12px; color: var(--c); margin-top: 1px; }
+  .row-t .del { color: var(--muted); font-size: 18px; line-height: 1; opacity: 0; padding: 0 4px; }
+  .row-t:hover .del { opacity: 1; }
+  .row-t .del:hover { color: var(--c1); }
+  .addrow { display: flex; align-items: center; gap: 12px; padding: 10px 0; color: var(--muted); }
+  .addrow .ring { width: 20px; height: 20px; border-radius: 50%; border: 1.6px dashed var(--muted); flex: none; }
+  .addrow input { flex: 1; border: 0; background: none; outline: none; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 0; }
+
+  /* ---------- narrow screens ---------- */
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    .sidebar { flex-direction: row; overflow-x: auto; overflow-y: hidden; padding: 10px 12px; gap: 8px; border-right: 0; border-bottom: 1px solid var(--line); align-items: center; }
+    .search, .sec-title, .foot { display: none; }
+    .tiles, .lists { display: contents; }
+    .tile, .li { width: auto; flex: none; flex-direction: row; align-items: center; gap: 8px; padding: 6px 12px 6px 8px; border-radius: 999px; }
+    .tile .row { gap: 8px; }
+    .tile .num { display: none; }
+    .tile .name, .li .nm { font-size: 14px; color: inherit; white-space: nowrap; }
+    .tile .badge, .li .badge { width: 22px; height: 22px; }
+    .tile .badge svg { width: 12px; height: 12px; }
+    .li .sub { display: none; }
+    .tile.active { background: var(--tc); color: #fff; border-color: transparent; }
+    .tile.active .name { color: #fff; }
+    .tile.active .badge { background: #fff; }
+    .tile.active .badge svg { stroke: var(--tc); }
+    .mh { padding: 14px 16px 6px; }
+    .mh h1 { font-size: 24px; }
+    .plane-wrap { padding: 8px 12px 16px; }
+    .listview { padding: 4px 16px 24px; }
+    .plane { min-height: 420px; }
   }
 </style>
 </head>
 <body>
-<header>
-  <h1>四象限看板</h1>
-  <form class="add" id="addForm">
-    <input id="newText" placeholder="添加任务,回车确认" autocomplete="off" required>
-    <select id="newQuad" aria-label="象限">
-      <option value="q1">重要且紧急</option>
-      <option value="q2" selected>重要不紧急</option>
-      <option value="q3">紧急不重要</option>
-      <option value="q4">不重要不紧急</option>
-    </select>
-    <button class="primary" type="submit">添加</button>
-  </form>
-  <div class="tools">
-    <button id="exportBtn" type="button">导出</button>
-    <button id="importBtn" type="button">导入</button>
-    <button id="clearDone" type="button">清除已完成</button>
-    <input id="importFile" type="file" accept="application/json" hidden>
-  </div>
-</header>
-<main id="board"></main>
+<div class="app">
+  <aside class="sidebar">
+    <input class="search" id="search" type="search" placeholder="搜索" autocomplete="off">
+    <div class="tiles" id="tiles"></div>
+    <div class="sec-title">象限清单</div>
+    <nav class="lists" id="lists"></nav>
+    <div class="foot">
+      <button id="exportBtn" type="button">导出</button>
+      <button id="importBtn" type="button">导入</button>
+      <input id="importFile" type="file" accept="application/json" hidden>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="mh">
+      <h1 id="title"></h1>
+      <span class="spacer"></span>
+      <button class="tx" id="clearBtn" type="button" hidden></button>
+      <span class="ct" id="count"></span>
+      <button class="plus" id="addBtn" type="button" title="新建" aria-label="新建">+</button>
+    </header>
+    <section id="content"></section>
+  </main>
+</div>
 
 <script>
-const QUADS = [
-  { id: 'q1', title: '重要且紧急', hint: '立刻做', color: 'var(--c1)' },
-  { id: 'q2', title: '重要不紧急', hint: '计划做', color: 'var(--c2)' },
-  { id: 'q3', title: '紧急不重要', hint: '委派 / 快速处理', color: 'var(--c3)' },
-  { id: 'q4', title: '不重要不紧急', hint: '少做 / 删除', color: 'var(--c4)' },
-];
-const KEY = 'quadrant-board:v1';
+const QUADS = {
+  q1: { name: '重要且紧急', hint: '立刻做', color: 'var(--c1)', icon: 'flame' },
+  q2: { name: '重要不紧急', hint: '计划做', color: 'var(--c2)', icon: 'calendar' },
+  q3: { name: '紧急不重要', hint: '委派 / 快速处理', color: 'var(--c3)', icon: 'bolt' },
+  q4: { name: '不重要不紧急', hint: '少做 / 删除', color: 'var(--c4)', icon: 'minus' },
+};
+const VIEWS = {
+  plane:     { name: '四象限', color: 'var(--blue)',     icon: 'plane' },
+  all:       { name: '全部',   color: 'var(--graphite)', icon: 'list' },
+  important: { name: '重要',   color: 'var(--purple)',   icon: 'star' },
+  done:      { name: '已完成', color: 'var(--gray)',     icon: 'check' },
+};
+const ICONS = {
+  plane: '<path d="M12 3v18M3 12h18"/>',
+  list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+  star: '<path d="M12 4v10M12 19v.01"/>',
+  check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  flame: '<path d="M12 3c1 4 5 5.5 5 10a5 5 0 0 1-10 0c0-2 1-3 2-4 .5 1.5 1.5 2 2 2-.5-3 0-6 1-8z"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  bolt: '<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>',
+  minus: '<path d="M6 12h12"/>',
+};
+const svg = k => `<svg viewBox="0 0 24 24">${ICONS[k]}</svg>`;
 
-let tasks = load();
+const KEY = 'quadrant-board:v2';
+const OLD_KEY = 'quadrant-board:v1';
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const rnd = (a, b) => a + Math.random() * (b - a);
 
+function randomPos(q) {
+  const urgent = q === 'q1' || q === 'q3', important = q === 'q1' || q === 'q2';
+  return { x: urgent ? rnd(.58, .88) : rnd(.12, .42), y: important ? rnd(.14, .42) : rnd(.58, .86) };
+}
+function quadOf(t) {
+  const important = t.y < .5, urgent = t.x >= .5;
+  return important ? (urgent ? 'q1' : 'q2') : (urgent ? 'q3' : 'q4');
+}
+function normalize(raw) {
+  if (!raw || typeof raw.text !== 'string') return null;
+  const t = { id: raw.id || uid(), text: raw.text, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null };
+  if (typeof raw.x === 'number' && typeof raw.y === 'number') { t.x = clamp(raw.x, 0.05, 0.95); t.y = clamp(raw.y, 0.05, 0.95); }
+  else {
+    if (!QUADS[raw.q]) return null;
+    Object.assign(t, randomPos(raw.q));
+  }
+  return t;
+}
 function load() {
-  try {
-    const v = JSON.parse(localStorage.getItem(KEY));
-    if (Array.isArray(v)) return v;
-  } catch (e) {}
+  for (const k of [KEY, OLD_KEY]) {
+    try {
+      const v = JSON.parse(localStorage.getItem(k));
+      if (Array.isArray(v)) return v.map(normalize).filter(Boolean);
+    } catch (e) {}
+  }
   return [];
 }
-function save() {
-  try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch (e) {}
-}
-const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+function save() { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch (e) {} }
 
-const board = document.getElementById('board');
+let tasks = load();
+let view = 'plane';
+try { const v = localStorage.getItem('quadrant-board:view'); if (v && (VIEWS[v] || QUADS[v])) view = v; } catch (e) {}
+let query = '';
+let pendingEdit = null;
+let pendingFocusAdd = false;
 
-function render() {
-  board.innerHTML = '';
-  for (const q of QUADS) {
-    const items = tasks.filter(t => t.q === q.id);
-    const el = document.createElement('section');
-    el.className = 'quad';
-    el.dataset.q = q.id;
-    el.style.setProperty('--c', q.color);
-    const open = items.filter(t => !t.done).length;
-    el.innerHTML = `<h2>${q.title}<small>${q.hint}</small><span class="count">${open} 待办</span></h2><div class="list"></div>`;
-    const list = el.querySelector('.list');
-    if (!items.length) list.innerHTML = '<div class="empty">拖拽任务到这里</div>';
-    for (const t of items) list.appendChild(taskEl(t));
-    el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
-    el.addEventListener('dragleave', () => el.classList.remove('over'));
-    el.addEventListener('drop', e => {
-      e.preventDefault(); el.classList.remove('over');
-      const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain'));
-      if (t && t.q !== q.id) { t.q = q.id; save(); render(); }
-    });
-    board.appendChild(el);
+const $ = id => document.getElementById(id);
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === 'class') el.className = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v);
   }
-}
-
-function taskEl(t) {
-  const el = document.createElement('div');
-  el.className = 'task' + (t.done ? ' done' : '');
-  el.draggable = true;
-  const cb = document.createElement('input');
-  cb.type = 'checkbox'; cb.checked = t.done;
-  cb.onchange = () => { t.done = cb.checked; save(); render(); };
-  const text = document.createElement('div');
-  text.className = 't'; text.textContent = t.text; text.contentEditable = 'plaintext-only';
-  text.onblur = () => {
-    const v = text.textContent.trim();
-    if (!v) { tasks = tasks.filter(x => x !== t); } else { t.text = v; }
-    save(); render();
-  };
-  text.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); text.blur(); } };
-  const x = document.createElement('button');
-  x.className = 'x'; x.textContent = '×'; x.title = '删除'; x.setAttribute('aria-label', '删除');
-  x.onclick = () => { tasks = tasks.filter(v => v !== t); save(); render(); };
-  el.append(cb, text, x);
-  el.addEventListener('dragstart', e => {
-    e.dataTransfer.setData('text/plain', t.id);
-    e.dataTransfer.effectAllowed = 'move';
-    el.classList.add('dragging');
-  });
-  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+  for (const c of kids.flat()) if (c != null) el.append(c);
   return el;
 }
 
-document.getElementById('addForm').addEventListener('submit', e => {
-  e.preventDefault();
-  const input = document.getElementById('newText');
-  const text = input.value.trim();
-  if (!text) return;
-  tasks.push({ id: uid(), text, q: document.getElementById('newQuad').value, done: false, created: Date.now() });
-  input.value = '';
+/* ---------- data ops ---------- */
+function addTask(q, text, pos) {
+  const p = pos || randomPos(q);
+  const t = { id: uid(), text: text || '', x: p.x, y: p.y, done: false, created: Date.now(), doneAt: null };
+  tasks.push(t);
+  return t;
+}
+function toggleDone(t) {
+  t.done = !t.done; t.doneAt = t.done ? Date.now() : null;
   save(); render();
+}
+function removeTask(t) { tasks = tasks.filter(x => x !== t); save(); render(); }
+
+function commitText(t, el) {
+  if (!tasks.includes(t)) return;
+  const v = el.textContent.trim();
+  el.removeAttribute('contenteditable');
+  if (!v) { removeTask(t); return; }
+  if (v !== t.text) { t.text = v; save(); render(); }
+}
+const PLAIN = (() => { const d = document.createElement('div'); d.contentEditable = 'plaintext-only'; return d.contentEditable === 'plaintext-only'; })();
+function startEdit(el) {
+  el.contentEditable = PLAIN ? 'plaintext-only' : 'true';
+  el.focus();
+  const r = document.createRange(); r.selectNodeContents(el);
+  const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+}
+function bindEditing(t, el) {
+  el.addEventListener('blur', () => commitText(t, el));
+  el.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); el.blur(); }
+  });
+}
+
+/* ---------- selectors ---------- */
+const open = () => tasks.filter(t => !t.done);
+function tasksFor(v) {
+  if (query) return tasks.filter(t => t.text.toLowerCase().includes(query.toLowerCase()));
+  if (v === 'done') return tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+  if (v === 'plane' || v === 'all') return open();
+  if (v === 'important') return open().filter(t => t.y < .5);
+  return open().filter(t => quadOf(t) === v);
+}
+
+/* ---------- render ---------- */
+function render() {
+  renderSidebar();
+  renderMain();
+  try { localStorage.setItem('quadrant-board:view', view); } catch (e) {}
+}
+
+function renderSidebar() {
+  const counts = {
+    plane: open().length, all: open().length,
+    important: open().filter(t => t.y < .5).length,
+    done: tasks.filter(t => t.done).length,
+  };
+  for (const q of Object.keys(QUADS)) counts[q] = open().filter(t => quadOf(t) === q).length;
+
+  const tiles = $('tiles'); tiles.innerHTML = '';
+  for (const [id, v] of Object.entries(VIEWS)) {
+    tiles.append(h('button', {
+      class: 'tile' + (view === id && !query ? ' active' : ''), style: `--tc:${v.color}`, type: 'button',
+      onclick: () => setView(id),
+    },
+      h('div', { class: 'row' }, h('span', { class: 'badge', html: svg(v.icon) }), h('span', { class: 'num' }, String(counts[id]))),
+      h('span', { class: 'name' }, v.name)));
+  }
+  const lists = $('lists'); lists.innerHTML = '';
+  for (const [id, q] of Object.entries(QUADS)) {
+    lists.append(h('button', {
+      class: 'li' + (view === id && !query ? ' active' : ''), style: `--tc:${q.color}`, type: 'button',
+      onclick: () => setView(id),
+    },
+      h('span', { class: 'badge', html: svg(q.icon) }),
+      h('span', { class: 'nm' }, q.name, ' ', h('span', { class: 'sub' }, q.hint)),
+      h('span', { class: 'ct' }, String(counts[id]))));
+  }
+}
+
+function setView(v) {
+  view = v; query = ''; $('search').value = '';
+  render();
+}
+
+function renderMain() {
+  const searching = !!query;
+  const meta = searching ? { name: '搜索结果', color: 'var(--blue)' } : (VIEWS[view] || QUADS[view]);
+  const list = tasksFor(view);
+  const title = $('title');
+  title.textContent = meta.name;
+  document.querySelector('.mh').style.setProperty('--vc', meta.color);
+  $('count').textContent = String(list.length);
+  const clear = $('clearBtn');
+  clear.hidden = !(view === 'done' && !searching && list.length);
+  clear.textContent = '清除全部';
+  $('addBtn').hidden = searching || view === 'done';
+
+  const content = $('content'); content.innerHTML = '';
+  if (view === 'plane' && !searching) content.append(renderPlane(list));
+  else content.append(renderList(list, searching));
+
+  if (pendingEdit) {
+    const el = content.querySelector(`[data-id="${pendingEdit}"] .t`);
+    pendingEdit = null;
+    if (el) startEdit(el);
+  } else if (pendingFocusAdd) {
+    const inp = content.querySelector('.addrow input');
+    if (inp) inp.focus();
+  }
+  pendingFocusAdd = false;
+}
+
+/* ---- plane ---- */
+function renderPlane(list) {
+  const wrap = h('div', { class: 'plane-wrap' });
+  wrap.append(h('div', { class: 'yaxis' }, h('span', {}, '重要'), h('span', { class: 'mid' }, '重要程度'), h('span', {}, '不重要')));
+  const plane = h('div', { class: 'plane' });
+  for (const id of ['q2', 'q1', 'q4', 'q3']) {
+    plane.append(h('div', { class: 'quad ' + id, style: `--c:${QUADS[id].color}` },
+      h('span', {}, `${QUADS[id].name} · ${QUADS[id].hint}`)));
+  }
+  plane.append(h('div', { class: 'vline' }), h('div', { class: 'hline' }));
+  if (!list.length) plane.append(h('div', { class: 'hint' }, '双击坐标系任意位置添加任务'));
+  for (const t of list) plane.append(chipEl(t, plane));
+  plane.addEventListener('dblclick', e => {
+    if (e.target.closest('.chip')) return;
+    const r = plane.getBoundingClientRect();
+    const t = addTask(null, '', { x: clamp((e.clientX - r.left) / r.width, .06, .94), y: clamp((e.clientY - r.top) / r.height, .06, .94) });
+    pendingEdit = t.id; render();
+  });
+  wrap.append(plane);
+  wrap.append(h('div', { class: 'xaxis' }, h('span', {}, '不紧急'), h('span', { class: 'mid' }, '紧急程度'), h('span', {}, '紧急')));
+  return wrap;
+}
+
+function chipEl(t, plane) {
+  const q = quadOf(t);
+  const chip = h('div', { class: 'chip' + (t.done ? ' done' : ''), 'data-id': t.id, style: `left:${t.x * 100}%;top:${t.y * 100}%;--c:${QUADS[q].color}` });
+  const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成' });
+  check.addEventListener('pointerdown', e => e.stopPropagation());
+  check.addEventListener('click', e => { e.stopPropagation(); toggleDone(t); });
+  const text = h('span', { class: 't' }, t.text);
+  bindEditing(t, text);
+  text.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(text); });
+  chip.append(check, text);
+
+  let start = null;
+  chip.addEventListener('pointerdown', e => {
+    if (text.isContentEditable || e.button !== 0) return;
+    const r = plane.getBoundingClientRect();
+    start = { cx: e.clientX, cy: e.clientY, x: t.x, y: t.y, w: r.width, h: r.height, moved: false };
+    chip.setPointerCapture(e.pointerId);
+  });
+  chip.addEventListener('pointermove', e => {
+    if (!start) return;
+    const dx = e.clientX - start.cx, dy = e.clientY - start.cy;
+    if (!start.moved && Math.hypot(dx, dy) < 4) return;
+    start.moved = true; chip.classList.add('drag');
+    t.x = clamp(start.x + dx / start.w, .04, .96);
+    t.y = clamp(start.y + dy / start.h, .05, .95);
+    chip.style.left = t.x * 100 + '%'; chip.style.top = t.y * 100 + '%';
+    chip.style.setProperty('--c', QUADS[quadOf(t)].color);
+  });
+  const end = () => {
+    if (!start) return;
+    const moved = start.moved; start = null;
+    chip.classList.remove('drag');
+    if (moved) { save(); render(); }
+  };
+  chip.addEventListener('pointerup', end);
+  chip.addEventListener('pointercancel', end);
+  return chip;
+}
+
+/* ---- list ---- */
+function renderList(list, searching) {
+  const box = h('div', { class: 'listview' });
+  const showTag = view === 'all' || view === 'important' || view === 'done' || searching;
+  for (const t of list) {
+    const q = quadOf(t);
+    const text = h('div', { class: 't', contenteditable: PLAIN ? 'plaintext-only' : 'true' }, t.text);
+    bindEditing(t, text);
+    const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成', onclick: () => toggleDone(t) });
+    box.append(h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[q].color}` },
+      check,
+      h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, QUADS[q].name) : null),
+      h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
+  }
+  if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : '这里还没有任务')));
+  if (!searching && view !== 'done') {
+    const q = QUADS[view] ? view : 'q2';
+    const input = h('input', { placeholder: '新提醒事项', autocomplete: 'off' });
+    input.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' || e.isComposing) return;
+      const v = input.value.trim();
+      if (!v) return;
+      addTask(q, v); pendingFocusAdd = true; save(); render();
+    });
+    box.append(h('div', { class: 'addrow' }, h('span', { class: 'ring' }), input));
+  }
+  return box;
+}
+
+/* ---------- global controls ---------- */
+$('search').addEventListener('input', e => { query = e.target.value.trim(); render(); });
+$('addBtn').addEventListener('click', () => {
+  if (view === 'plane') {
+    const t = addTask('q2', ''); pendingEdit = t.id; render();
+  } else {
+    pendingFocusAdd = true; render();
+  }
+});
+$('clearBtn').addEventListener('click', () => {
+  const n = tasks.filter(t => t.done).length;
+  if (n && confirm(`永久删除 ${n} 个已完成任务?`)) { tasks = tasks.filter(t => !t.done); save(); render(); }
 });
 
-document.getElementById('clearDone').onclick = () => {
-  const n = tasks.filter(t => t.done).length;
-  if (n && confirm(`清除 ${n} 个已完成任务?`)) { tasks = tasks.filter(t => !t.done); save(); render(); }
-};
-
-document.getElementById('exportBtn').onclick = () => {
+$('exportBtn').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(tasks, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `quadrant-board-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   URL.revokeObjectURL(a.href);
-};
-
-const importFile = document.getElementById('importFile');
-document.getElementById('importBtn').onclick = () => importFile.click();
-importFile.onchange = async () => {
+});
+const importFile = $('importFile');
+$('importBtn').addEventListener('click', () => importFile.click());
+importFile.addEventListener('change', async () => {
   const f = importFile.files[0];
   importFile.value = '';
   if (!f) return;
   try {
     const v = JSON.parse(await f.text());
     if (!Array.isArray(v)) throw 0;
-    const ids = new Set(QUADS.map(q => q.id));
-    const clean = v.filter(t => t && typeof t.text === 'string' && ids.has(t.q))
-      .map(t => ({ id: t.id || uid(), text: t.text, q: t.q, done: !!t.done, created: t.created || Date.now() }));
+    const clean = v.map(normalize).filter(Boolean);
     if (confirm(`导入 ${clean.length} 个任务,将覆盖当前数据,继续?`)) { tasks = clean; save(); render(); }
   } catch (e) { alert('导入失败:文件格式不正确'); }
-};
+});
 
 render();
 </script>
