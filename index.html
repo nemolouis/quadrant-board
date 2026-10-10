@@ -408,7 +408,12 @@ function chipEl(t, plane) {
   check.addEventListener('click', e => { e.stopPropagation(); toggleDone(t); });
   const text = h('span', { class: 't' }, t.text);
   bindEditing(t, text);
-  text.addEventListener('dblclick', e => { e.stopPropagation(); startEdit(text); });
+  // pointer capture retargets click events to the chip, so listen there
+  chip.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (e.target.closest('.check') || text.isContentEditable) return;
+    startEdit(text);
+  });
   chip.append(check, text);
 
   let st = null, raf = 0;
