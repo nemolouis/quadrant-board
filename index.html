@@ -141,6 +141,54 @@
   .addrow input { flex: 1; border: 0; background: none; outline: none; }
   .empty { color: var(--muted); text-align: center; padding: 60px 0; }
 
+
+  /* ---------- deadline ---------- */
+  .datebtn { display: none; align-items: center; gap: 4px; flex: none; color: var(--muted); font-size: 12px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap; }
+  .datebtn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .datebtn.has { display: inline-flex; background: var(--hover); }
+  .datebtn.overdue { color: var(--c1); background: color-mix(in srgb, var(--c1) 14%, transparent); }
+  .chip:hover .datebtn, .chip:focus-within .datebtn, .row-t:hover .datebtn, .row-t:focus-within .datebtn { display: inline-flex; }
+  .datebtn:hover { background: var(--active); }
+  .pop {
+    position: fixed; z-index: 100; background: var(--chip); border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0,0,0,.25); padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .pop input[type=date] { font: inherit; color: inherit; background: var(--hover); border: 0; border-radius: 8px; padding: 6px 8px; color-scheme: light dark; }
+  .pop .quick { display: flex; gap: 6px; }
+  .pop .quick button { flex: 1; padding: 5px 8px; border-radius: 8px; background: var(--hover); font-size: 13px; white-space: nowrap; }
+  .pop .quick button:hover { background: var(--active); }
+
+  /* ---------- calendar ---------- */
+  .cal { flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 28px 24px; }
+  .cal-bar { display: flex; align-items: center; gap: 12px; padding: 4px 0 10px; }
+  .cal-title { font-size: 18px; font-weight: 600; margin-right: auto; }
+  .cal-nav { display: flex; gap: 4px; }
+  .cal-nav button { padding: 4px 12px; border-radius: 8px; background: var(--hover); font-size: 14px; }
+  .cal-nav button:hover { background: var(--active); }
+  .cal-week { display: grid; grid-template-columns: repeat(7, 1fr); color: var(--muted); font-size: 12px; padding-bottom: 6px; }
+  .cal-week span { text-align: center; }
+  .cal-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, 1fr); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+  .day { border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 4px 4px 2px; display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+  .day.other .num { color: var(--muted); opacity: .5; }
+  .day.over { background: var(--hover); }
+  .day .num { font-size: 13px; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; margin-bottom: 2px; flex: none; align-self: flex-start; }
+  .day.today .num { background: var(--blue); color: #fff; font-weight: 600; }
+  .pills { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; gap: 3px; }
+  .pills::-webkit-scrollbar { display: none; }
+  .pill {
+    display: flex; align-items: center; gap: 5px; padding: 2px 6px 2px 4px; border-radius: 6px; font-size: 12px; line-height: 1.5;
+    background: color-mix(in srgb, var(--c) 15%, transparent); border-left: 3px solid var(--c); cursor: grab; flex: none;
+  }
+  .pill .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; outline: none; }
+  .pill .t[contenteditable] { text-overflow: clip; cursor: text; user-select: text; -webkit-user-select: text; }
+  .pill.done .t { text-decoration: line-through; color: var(--muted); }
+  .pill.overdue .t { color: var(--c1); }
+  .pill .check { width: 13px; height: 13px; border-width: 1.4px; }
+  .pill.done .check::after { left: 3.5px; top: 1px; width: 3.5px; height: 7px; border-width: 0 1.6px 1.6px 0; }
+  .pill .rm { color: var(--muted); font-size: 14px; line-height: 1; display: none; padding: 0 2px; }
+  .pill:hover .rm { display: block; }
+  .pill .rm:hover { color: var(--c1); }
+
   /* ---------- narrow screens ---------- */
   @media (max-width: 760px) {
     .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
@@ -154,6 +202,10 @@
     .plane { min-height: 480px; }
     .qcell { padding: 30px 6px; }
     .listview { padding: 4px 16px 24px; }
+    .cal { padding: 4px 8px 16px; }
+    .day { padding: 2px; }
+    .pill { font-size: 11px; padding: 1px 4px 1px 3px; }
+    .pill .check { display: none; }
   }
 </style>
 </head>
@@ -189,6 +241,7 @@ const QUADS = {
   q4: { name: '不重要不紧急', short: '少做',   color: 'var(--c4)' },
 };
 const CROSS = '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>';
+const CALICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 const KEY = 'quadrant-board:v3';
@@ -205,7 +258,8 @@ function normalize(raw) {
       q = imp ? (urg ? 'q1' : 'q2') : (urg ? 'q3' : 'q4');
     } else return null;
   }
-  return { id: raw.id || uid(), text: raw.text, q, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null };
+  return { id: raw.id || uid(), text: raw.text, q, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null,
+    due: typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : null };
 }
 function load() {
   for (const k of [KEY, 'quadrant-board:v2', 'quadrant-board:v1']) {
@@ -223,7 +277,7 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catc
 
 let tasks = load();
 let view = 'plane';
-try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || QUADS[v]) view = v; } catch (e) {}
+try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || v === 'cal' || QUADS[v]) view = v; } catch (e) {}
 let query = '';
 let pendingEdit = null;
 let pendingFocusAdd = false;
@@ -242,8 +296,8 @@ function h(tag, props, ...kids) {
 }
 const open = () => tasks.filter(t => !t.done);
 
-function addTask(q, text) {
-  const t = { id: uid(), text: text || '', q, done: false, created: Date.now(), doneAt: null };
+function addTask(q, text, due) {
+  const t = { id: uid(), text: text || '', q, done: false, created: Date.now(), doneAt: null, due: due || null };
   tasks.push(t);
   return t;
 }
@@ -333,6 +387,7 @@ function renderNav() {
     style: color ? `--c:${color}` : '', onclick: () => setView(id),
   }, h('span', { class: 'ico', html: icon }), h('span', { class: 'nm' }, name), h('span', { class: 'ct' }, count ? String(count) : ''));
   nav.append(item('plane', CROSS, '四象限', open().length));
+  nav.append(item('cal', CALICON, '日历', open().filter(t => t.due).length));
   nav.append(h('div', { class: 'sep' }));
   for (const [id, q] of Object.entries(QUADS)) {
     nav.append(item(id, '<span class="dot"></span>', q.short, open().filter(t => t.q === id).length, q.color, q.name));
@@ -347,19 +402,21 @@ function tasksFor() {
   if (query) return tasks.filter(t => t.text.toLowerCase().includes(query.toLowerCase()));
   if (view === 'done') return tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   if (view === 'plane') return open();
+  if (view === 'cal') return tasks.filter(t => t.due);
   return open().filter(t => t.q === view);
 }
 
 function renderMain() {
   const searching = !!query;
   const list = tasksFor();
-  $('title').textContent = searching ? '搜索结果' : view === 'plane' ? '四象限' : view === 'done' ? '已完成' : QUADS[view].name;
-  $('sub').textContent = searching || view === 'plane' || view === 'done' ? `${list.length} 项` : `${QUADS[view].short} · ${list.length} 项`;
+  $('title').textContent = searching ? '搜索结果' : view === 'plane' ? '四象限' : view === 'cal' ? '日历' : view === 'done' ? '已完成' : QUADS[view].name;
+  $('sub').textContent = searching || view === 'plane' || view === 'done' ? `${list.length} 项` : view === 'cal' ? `${list.length} 项有截止日期` : `${QUADS[view].short} · ${list.length} 项`;
   $('clearBtn').hidden = !(view === 'done' && !searching && list.length);
-  $('addBtn').hidden = searching || view === 'done';
+  $('addBtn').hidden = searching || view === 'done' || view === 'cal';
 
   const content = $('content'); content.innerHTML = '';
   if (view === 'plane' && !searching) content.append(renderPlane(list));
+  else if (view === 'cal' && !searching) content.append(renderCalendar());
   else content.append(renderList(list, searching));
 
   if (pendingEdit) {
@@ -414,7 +471,7 @@ function chipEl(t, plane) {
     if (e.target.closest('.check') || text.isContentEditable) return;
     startEdit(text);
   });
-  chip.append(check, text);
+  chip.append(check, text, dateControl(t));
 
   let st = null, raf = 0;
 
@@ -504,6 +561,7 @@ function renderList(list, searching) {
     box.append(h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` },
       check,
       h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, QUADS[t.q].name) : null),
+      dateControl(t),
       h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
   }
   if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : '这里还没有任务')));
@@ -519,6 +577,134 @@ function renderList(list, searching) {
     box.append(h('div', { class: 'addrow' }, h('span', { class: 'ring' }), input));
   }
   return box;
+}
+
+
+/* ---------- deadline helpers ---------- */
+const pad2 = n => String(n).padStart(2, '0');
+const ymd = d => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const addDays = n => { const d = new Date(); d.setDate(d.getDate() + n); return ymd(d); };
+const isOverdue = t => !!t.due && !t.done && t.due < ymd(new Date());
+function dueLabel(s) {
+  if (s === addDays(0)) return '今天';
+  if (s === addDays(1)) return '明天';
+  const d = parseYmd(s);
+  return (d.getFullYear() !== new Date().getFullYear() ? d.getFullYear() + '/' : '') + (d.getMonth() + 1) + '/' + d.getDate();
+}
+function setDue(t, v) { t.due = v || null; closePop(); save(); render(); }
+
+let pop = null;
+function onOutside(e) { if (pop && !pop.contains(e.target)) closePop(); }
+function onEsc(e) { if (e.key === 'Escape') closePop(); }
+function closePop() {
+  if (!pop) return;
+  pop.remove(); pop = null;
+  document.removeEventListener('pointerdown', onOutside, true);
+  document.removeEventListener('keydown', onEsc);
+}
+function openDatePicker(t, anchor) {
+  closePop();
+  const input = h('input', { type: 'date', value: t.due || '' });
+  input.addEventListener('change', () => setDue(t, input.value));
+  const quick = (label, fn) => h('button', { type: 'button', onclick: () => setDue(t, fn()) }, label);
+  pop = h('div', { class: 'pop' }, input,
+    h('div', { class: 'quick' }, quick('今天', () => addDays(0)), quick('明天', () => addDays(1)), quick('下周', () => addDays(7)),
+      t.due ? quick('清除', () => null) : null));
+  document.body.append(pop);
+  const r = anchor.getBoundingClientRect();
+  const left = clamp(r.left, 8, innerWidth - pop.offsetWidth - 8);
+  let top = r.bottom + 6;
+  if (top + pop.offsetHeight > innerHeight - 8) top = Math.max(8, r.top - pop.offsetHeight - 6);
+  pop.style.left = left + 'px'; pop.style.top = top + 'px';
+  document.addEventListener('pointerdown', onOutside, true);
+  document.addEventListener('keydown', onEsc);
+}
+function dateControl(t) {
+  const b = h('button', {
+    class: 'datebtn' + (t.due ? ' has' : '') + (isOverdue(t) ? ' overdue' : ''), type: 'button',
+    title: t.due ? '修改截止日期' : '添加截止日期',
+  });
+  if (t.due) b.textContent = dueLabel(t.due); else b.innerHTML = CALICON;
+  b.addEventListener('pointerdown', e => e.stopPropagation());
+  b.addEventListener('mousedown', e => e.preventDefault()); // keep text focus while editing
+  b.addEventListener('dblclick', e => e.stopPropagation());
+  b.addEventListener('click', e => { e.stopPropagation(); openDatePicker(t, b); });
+  return b;
+}
+
+/* ---------- calendar ---------- */
+const now0 = new Date();
+let cal = { y: now0.getFullYear(), m: now0.getMonth() };
+function shiftMonth(n) {
+  const d = new Date(cal.y, cal.m + n, 1);
+  cal = { y: d.getFullYear(), m: d.getMonth() };
+  render();
+}
+function renderCalendar() {
+  const root = h('div', { class: 'cal' });
+  root.append(h('div', { class: 'cal-bar' },
+    h('div', { class: 'cal-title' }, `${cal.y}年${cal.m + 1}月`),
+    h('div', { class: 'cal-nav' },
+      h('button', { type: 'button', 'aria-label': '上个月', onclick: () => shiftMonth(-1) }, '‹'),
+      h('button', { type: 'button', onclick: () => { const n = new Date(); cal = { y: n.getFullYear(), m: n.getMonth() }; render(); } }, '今天'),
+      h('button', { type: 'button', 'aria-label': '下个月', onclick: () => shiftMonth(1) }, '›'))));
+  root.append(h('div', { class: 'cal-week' }, ...['一', '二', '三', '四', '五', '六', '日'].map(w => h('span', {}, w))));
+
+  const offset = (new Date(cal.y, cal.m, 1).getDay() + 6) % 7;
+  const days = new Date(cal.y, cal.m + 1, 0).getDate();
+  const weeks = Math.ceil((offset + days) / 7);
+  const grid = h('div', { class: 'cal-grid', style: `grid-template-rows:repeat(${weeks},minmax(0,1fr))` });
+  const byDate = {};
+  for (const t of tasks) if (t.due) (byDate[t.due] = byDate[t.due] || []).push(t);
+  const today = ymd(new Date());
+
+  for (let i = 0; i < weeks * 7; i++) {
+    const d = new Date(cal.y, cal.m, 1 - offset + i);
+    const s = ymd(d);
+    const pills = h('div', { class: 'pills' });
+    for (const t of byDate[s] || []) pills.append(pillEl(t));
+    const cell = h('div', { class: 'day' + (d.getMonth() !== cal.m ? ' other' : '') + (s === today ? ' today' : '') },
+      h('div', { class: 'num' }, String(d.getDate())), pills);
+    cell.addEventListener('dblclick', e => {
+      if (e.target.closest('.pill')) return;
+      const t = addTask('q2', '', s);
+      pendingEdit = t.id; save(); render();
+    });
+    cell.addEventListener('dragover', e => { e.preventDefault(); cell.classList.add('over'); });
+    cell.addEventListener('dragleave', e => { if (!cell.contains(e.relatedTarget)) cell.classList.remove('over'); });
+    cell.addEventListener('drop', e => {
+      e.preventDefault(); cell.classList.remove('over');
+      const t = tasks.find(x => x.id === e.dataTransfer.getData('text/plain'));
+      if (t && t.due !== s) { t.due = s; save(); render(); }
+    });
+    grid.append(cell);
+  }
+  root.append(grid);
+  return root;
+}
+function pillEl(t) {
+  const pill = h('div', {
+    class: 'pill' + (t.done ? ' done' : '') + (isOverdue(t) ? ' overdue' : ''), draggable: 'true', 'data-id': t.id,
+    style: `--c:${QUADS[t.q].color}`, title: `${QUADS[t.q].name}`,
+  });
+  const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成', onclick: e => { e.stopPropagation(); toggleDone(t); } });
+  const text = h('span', { class: 't' }, t.text);
+  bindEditing(t, text);
+  const rm = h('button', { class: 'rm', type: 'button', title: '移除截止日期', 'aria-label': '移除截止日期',
+    onclick: e => { e.stopPropagation(); setDue(t, null); } }, '×');
+  pill.addEventListener('dblclick', e => {
+    e.stopPropagation();
+    if (e.target.closest('.check') || text.isContentEditable) return;
+    pill.draggable = false;
+    startEdit(text);
+  });
+  pill.addEventListener('dragstart', e => {
+    e.dataTransfer.setData('text/plain', t.id);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+  pill.append(check, text, rm);
+  return pill;
 }
 
 /* ---------- global controls ---------- */
