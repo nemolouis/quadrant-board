@@ -142,6 +142,22 @@
   .empty { color: var(--muted); text-align: center; padding: 60px 0; }
 
 
+  /* ---------- today ---------- */
+  .nav.drop { background: color-mix(in srgb, var(--blue) 22%, transparent); outline: 2px solid var(--blue); }
+  .nav[data-view="today"] .ico svg { stroke: var(--c3); }
+  .chip.intoday::after {
+    content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%;
+    background: var(--c3); box-shadow: 0 0 0 2px var(--bg);
+  }
+  .chip { position: relative; }
+  .chip.drag { position: fixed; }
+  .chip.settle { transition: transform .26s cubic-bezier(.2,.9,.25,1), box-shadow .26s ease, opacity .26s ease; }
+  .todaybtn { display: none; flex: none; color: var(--muted); padding: 2px 4px; border-radius: 6px; }
+  .todaybtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
+  .todaybtn.on { display: inline-flex; color: var(--c3); }
+  .row-t:hover .todaybtn, .row-t:focus-within .todaybtn { display: inline-flex; }
+  .todaybtn:hover { background: var(--active); }
+
   /* ---------- deadline ---------- */
   .datebtn { display: none; align-items: center; gap: 4px; flex: none; color: var(--muted); font-size: 12px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap; }
   .datebtn svg { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -242,6 +258,7 @@ const QUADS = {
 };
 const CROSS = '<svg viewBox="0 0 24 24"><path d="M12 3v18M3 12h18"/></svg>';
 const CALICON = '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>';
+const TODAYICON = '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg>';
 const CHECK = '<svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
 
 const KEY = 'quadrant-board:v3';
@@ -259,6 +276,7 @@ function normalize(raw) {
     } else return null;
   }
   return { id: raw.id || uid(), text: raw.text, q, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null,
+    today: !!raw.today,
     due: typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : null };
 }
 function load() {
@@ -277,7 +295,7 @@ function save() { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catc
 
 let tasks = load();
 let view = 'plane';
-try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || v === 'cal' || QUADS[v]) view = v; } catch (e) {}
+try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || v === 'cal' || v === 'today' || QUADS[v]) view = v; } catch (e) {}
 let query = '';
 let pendingEdit = null;
 let pendingFocusAdd = false;
@@ -384,9 +402,10 @@ function renderNav() {
   const nav = $('nav'); nav.innerHTML = '';
   const item = (id, icon, name, count, color, title) => h('button', {
     class: 'nav' + (view === id && !query ? ' active' : ''), type: 'button', title: title || name,
-    style: color ? `--c:${color}` : '', onclick: () => setView(id),
+    style: color ? `--c:${color}` : '', 'data-view': id, onclick: () => setView(id),
   }, h('span', { class: 'ico', html: icon }), h('span', { class: 'nm' }, name), h('span', { class: 'ct' }, count ? String(count) : ''));
   nav.append(item('plane', CROSS, '四象限', open().length));
+  nav.append(item('today', TODAYICON, '今日', open().filter(t => t.today).length));
   nav.append(item('cal', CALICON, '日历', open().filter(t => t.due).length));
   nav.append(h('div', { class: 'sep' }));
   for (const [id, q] of Object.entries(QUADS)) {
@@ -403,14 +422,15 @@ function tasksFor() {
   if (view === 'done') return tasks.filter(t => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
   if (view === 'plane') return open();
   if (view === 'cal') return tasks.filter(t => t.due);
+  if (view === 'today') return open().filter(t => t.today).sort((a, b) => Object.keys(QUADS).indexOf(a.q) - Object.keys(QUADS).indexOf(b.q));
   return open().filter(t => t.q === view);
 }
 
 function renderMain() {
   const searching = !!query;
   const list = tasksFor();
-  $('title').textContent = searching ? '搜索结果' : view === 'plane' ? '四象限' : view === 'cal' ? '日历' : view === 'done' ? '已完成' : QUADS[view].name;
-  $('sub').textContent = searching || view === 'plane' || view === 'done' ? `${list.length} 项` : view === 'cal' ? `${list.length} 项有截止日期` : `${QUADS[view].short} · ${list.length} 项`;
+  $('title').textContent = searching ? '搜索结果' : view === 'plane' ? '四象限' : view === 'cal' ? '日历' : view === 'today' ? '今日' : view === 'done' ? '已完成' : QUADS[view].name;
+  $('sub').textContent = searching || view === 'plane' || view === 'done' || view === 'today' ? `${list.length} 项` : view === 'cal' ? `${list.length} 项有截止日期` : `${QUADS[view].short} · ${list.length} 项`;
   $('clearBtn').hidden = !(view === 'done' && !searching && list.length);
   $('addBtn').hidden = searching || view === 'done' || view === 'cal';
 
@@ -458,8 +478,16 @@ function renderPlane(list) {
   return h('div', { class: 'plane-wrap' }, plane);
 }
 
+function todayNav() { return document.querySelector('.nav[data-view="today"]'); }
+function overToday(x, y) {
+  const el = todayNav();
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+}
+
 function chipEl(t, plane) {
-  const chip = h('div', { class: 'chip' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` });
+  const chip = h('div', { class: 'chip' + (t.done ? ' done' : '') + (t.today ? ' intoday' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` });
   const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成' });
   check.addEventListener('pointerdown', e => e.stopPropagation());
   check.addEventListener('click', e => { e.stopPropagation(); toggleDone(t); });
@@ -519,7 +547,9 @@ function chipEl(t, plane) {
       raf = 0;
       if (!st || !st.active || st.settling) return;
       chip.style.transform = `translate3d(${st.x - st.sx}px,${st.y - st.sy}px,0)`;
-      retarget(st.x, st.y);
+      const over = overToday(st.x, st.y);
+      todayNav() && todayNav().classList.toggle('drop', over);
+      if (!over) retarget(st.x, st.y);
     });
   });
   const end = () => {
@@ -529,12 +559,20 @@ function chipEl(t, plane) {
     if (s.settling) return;
     s.settling = true;
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
-    const p = s.ph.getBoundingClientRect();
+    const toToday = overToday(s.x, s.y);
     chip.classList.add('settle');
-    chip.style.transform = `translate3d(${p.left - s.left}px,${p.top - s.top}px,0)`;
+    if (toToday) {
+      const nr = todayNav().getBoundingClientRect();
+      chip.style.opacity = '0';
+      chip.style.transform = `translate3d(${nr.left + nr.width / 2 - (s.left + chip.offsetWidth / 2)}px,${nr.top + nr.height / 2 - (s.top + chip.offsetHeight / 2)}px,0) scale(.2)`;
+    } else {
+      const p = s.ph.getBoundingClientRect();
+      chip.style.transform = `translate3d(${p.left - s.left}px,${p.top - s.top}px,0)`;
+    }
     let finished = false;
     const finish = () => {
       if (finished) return; finished = true;
+      if (toToday) { st = null; t.today = true; save(); render(); return; }
       const stack = s.ph.parentNode;
       const kids = [...stack.children].filter(c => c !== s.ph && c !== chip && c.dataset.id);
       const idx = kids.filter(k => k.compareDocumentPosition(s.ph) & Node.DOCUMENT_POSITION_FOLLOWING).length;
@@ -553,7 +591,7 @@ function chipEl(t, plane) {
 /* ---- list ---- */
 function renderList(list, searching) {
   const box = h('div', { class: 'listview' });
-  const showTag = view === 'done' || searching;
+  const showTag = view === 'done' || view === 'today' || searching;
   for (const t of list) {
     const text = h('div', { class: 't', contenteditable: PLAIN ? 'plaintext-only' : 'true' }, t.text);
     bindEditing(t, text);
@@ -562,9 +600,14 @@ function renderList(list, searching) {
       check,
       h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, QUADS[t.q].name) : null),
       dateControl(t),
-      h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
+      view === 'today' ? null : h('button', {
+        class: 'todaybtn' + (t.today ? ' on' : ''), type: 'button', title: t.today ? '移出今日' : '加入今日', html: TODAYICON,
+        onclick: () => { t.today = !t.today; save(); render(); } }),
+      view === 'today'
+        ? h('button', { class: 'del', type: 'button', title: '移出今日', 'aria-label': '移出今日', onclick: () => { t.today = false; save(); render(); } }, '×')
+        : h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
   }
-  if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : '这里还没有任务')));
+  if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : view === 'today' ? '今日清单是空的:把四象限里的任务拖到左侧「今日」' : '这里还没有任务')));
   if (!searching && view !== 'done') {
     const q = QUADS[view] ? view : 'q2';
     const input = h('input', { placeholder: '新任务', autocomplete: 'off' });
@@ -572,7 +615,9 @@ function renderList(list, searching) {
       if (e.key !== 'Enter' || e.isComposing) return;
       const v = input.value.trim();
       if (!v) return;
-      addTask(q, v); pendingFocusAdd = true; save(); render();
+      const nt = addTask(q, v);
+      if (view === 'today') nt.today = true;
+      pendingFocusAdd = true; save(); render();
     });
     box.append(h('div', { class: 'addrow' }, h('span', { class: 'ring' }), input));
   }
