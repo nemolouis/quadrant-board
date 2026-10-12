@@ -145,13 +145,16 @@
   /* ---------- today ---------- */
   .nav.drop { background: color-mix(in srgb, var(--blue) 22%, transparent); outline: 2px solid var(--blue); }
   .nav[data-view="today"] .ico svg { stroke: var(--c3); }
-  .chip.intoday::after {
-    content: ""; position: absolute; top: -3px; right: -3px; width: 9px; height: 9px; border-radius: 50%;
-    background: var(--c3); box-shadow: 0 0 0 2px var(--bg);
-  }
   .chip { position: relative; }
   .chip.drag { position: fixed; }
   .chip.settle { transition: transform .26s cubic-bezier(.2,.9,.25,1), box-shadow .26s ease, opacity .26s ease; }
+  .today-stage { flex: 1; min-height: 0; display: flex; overflow-y: auto; scrollbar-width: none; padding: 24px 0; user-select: none; -webkit-user-select: none; }
+  .today-stage::-webkit-scrollbar { display: none; }
+  .today-stage .stack { gap: 10px; }
+  .chip.static { cursor: default; touch-action: auto; }
+  .chip .rmtoday { display: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 2px; flex: none; }
+  .chip:hover .rmtoday { display: block; }
+  .chip .rmtoday:hover { color: var(--c1); }
   .todaybtn { display: none; flex: none; color: var(--muted); padding: 2px 4px; border-radius: 6px; }
   .todaybtn svg { width: 16px; height: 16px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; }
   .todaybtn.on { display: inline-flex; color: var(--c3); }
@@ -390,7 +393,7 @@ function flip(root, first, skip) {
 let lastView = null;
 function render() {
   const content = $('content');
-  const first = (view === lastView && view === 'plane' && !query) ? snapshot(content) : null;
+  const first = (view === lastView && (view === 'plane' || view === 'today') && !query) ? snapshot(content) : null;
   renderNav();
   renderMain();
   if (first) flip(content, first);
@@ -437,6 +440,7 @@ function renderMain() {
   const content = $('content'); content.innerHTML = '';
   if (view === 'plane' && !searching) content.append(renderPlane(list));
   else if (view === 'cal' && !searching) content.append(renderCalendar());
+  else if (view === 'today' && !searching) content.append(renderToday(list));
   else content.append(renderList(list, searching));
 
   if (pendingEdit) {
@@ -455,6 +459,19 @@ function quadAt(plane, px, py) {
   const r = plane.getBoundingClientRect();
   const urgent = px >= r.left + r.width / 2, important = py < r.top + r.height / 2;
   return important ? (urgent ? 'q1' : 'q2') : (urgent ? 'q3' : 'q4');
+}
+
+function renderToday(list) {
+  const stack = h('div', { class: 'stack' });
+  for (const t of list) stack.append(chipEl(t, null, { static: true }));
+  const stage = h('div', { class: 'today-stage' }, stack);
+  if (!list.length) stack.append(h('div', { class: 'empty' }, '把四象限里的任务拖到左侧「今日」'));
+  stage.addEventListener('dblclick', e => {
+    if (e.target.closest('.chip')) return;
+    const t = addTask('q2', ''); t.today = true;
+    pendingEdit = t.id; save(); render();
+  });
+  return h('div', { class: 'plane-wrap' }, stage);
 }
 
 function renderPlane(list) {
@@ -486,8 +503,8 @@ function overToday(x, y) {
   return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
 }
 
-function chipEl(t, plane) {
-  const chip = h('div', { class: 'chip' + (t.done ? ' done' : '') + (t.today ? ' intoday' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` });
+function chipEl(t, plane, opts = {}) {
+  const chip = h('div', { class: 'chip' + (t.done ? ' done' : '') + (opts.static ? ' static' : ''), 'data-id': t.id, style: `--c:${QUADS[t.q].color}` });
   const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成' });
   check.addEventListener('pointerdown', e => e.stopPropagation());
   check.addEventListener('click', e => { e.stopPropagation(); toggleDone(t); });
@@ -500,6 +517,11 @@ function chipEl(t, plane) {
     startEdit(text);
   });
   chip.append(check, text, dateControl(t));
+  if (opts.static) {
+    chip.append(h('button', { class: 'rmtoday', type: 'button', title: '移出今日', 'aria-label': '移出今日',
+      onpointerdown: e => e.stopPropagation(), onclick: e => { e.stopPropagation(); t.today = false; save(); render(); } }, '×'));
+    return chip;
+  }
 
   let st = null, raf = 0;
 
@@ -755,7 +777,10 @@ function pillEl(t) {
 /* ---------- global controls ---------- */
 $('search').addEventListener('input', e => { query = e.target.value.trim(); render(); });
 $('addBtn').addEventListener('click', () => {
-  if (view === 'plane') { const t = addTask('q2', ''); pendingEdit = t.id; render(); }
+  if (view === 'plane' || view === 'today') {
+    const t = addTask('q2', ''); if (view === 'today') t.today = true;
+    pendingEdit = t.id; save(); render();
+  }
   else { pendingFocusAdd = true; render(); }
 });
 $('clearBtn').addEventListener('click', () => {
