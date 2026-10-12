@@ -902,7 +902,7 @@ importFile.addEventListener('change', async () => {
 /* ---------- cloud sync (Supabase, local-first) ---------- */
 const SUPABASE_URL = 'https://ywmvhnxnrlxitmzjyedi.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_MUuRsuqtP8w42jMFcHT_hw_DVpGJynx'; // publishable key: safe to ship, data is protected by RLS
-let sb = null, user = null, channel = null, pushing = false, pushTimer = 0, syncState = 'off';
+let lastErr = '', sb = null, user = null, channel = null, pushing = false, pushTimer = 0, syncState = 'off';
 try {
   if (window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
 } catch (e) { sb = null; }
@@ -962,7 +962,8 @@ function applyRows(rows) {
 async function pull() {
   if (!sb || !user) return;
   const { data, error } = await sb.from('tasks').select('id,data,updated_at,deleted');
-  if (error) { setSync(navigator.onLine ? 'error' : 'offline'); return; }
+  if (error) { lastErr = error.message || String(error); setSync(navigator.onLine ? 'error' : 'offline'); return; }
+  lastErr = '';
   applyRows(data);
   const have = new Set(data.map(r => r.id));
   for (const t of tasks) if (!have.has(t.id)) dirty.add(t.id);
@@ -993,11 +994,12 @@ async function push() {
     try {
       const { error } = await sb.from('tasks').upsert(rows, { onConflict: 'user_id,id' });
       failed = !!error;
+      if (error) lastErr = error.message || String(error);
       if (!error) for (const [id, u] of sent) {
         const t = tasks.find(x => x.id === id), x = tombs.find(z => z.id === id);
         if ((t ? t.u : x && x.u) === u) dirty.delete(id);
       }
-    } catch (e) { failed = true; }
+    } catch (e) { failed = true; lastErr = String(e && e.message || e); }
   }
   persist();
   pushing = false;
@@ -1042,7 +1044,7 @@ function showAuth() {
   $('authErr').textContent = '';
   $('authOut').hidden = !!user; $('authIn').hidden = !user;
   $('authTitle').textContent = user ? '云同步' : '登录以同步';
-  if (user) $('authWho').textContent = `已登录:${user.email}` + (syncState === 'error' ? '(上次同步失败,请重试)' : '');
+  if (user) $('authWho').textContent = `已登录:${user.email}` + (syncState === 'error' ? `(同步失败:${lastErr || '未知错误'})` : '');
   if (!dlg.open) dlg.showModal();
 }
 $('syncBtn').addEventListener('click', () => {

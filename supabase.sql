@@ -10,6 +10,9 @@ create table if not exists public.tasks (
 
 alter table public.tasks enable row level security;
 
+-- 新项目不会自动给 API 角色授权,需要显式授权(RLS 仍然保证只能访问自己的行)
+grant select, insert, update, delete on public.tasks to authenticated;
+
 drop policy if exists "own tasks" on public.tasks;
 create policy "own tasks" on public.tasks
   for all
