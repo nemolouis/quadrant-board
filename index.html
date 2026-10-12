@@ -3,6 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1c1c1e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="四象限">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
 <title>四象限看板</title>
 <meta name="description" content="艾森豪威尔四象限时间管理:一个十字坐标系安排所有任务,数据保存在本地浏览器。">
 <style>
@@ -142,6 +148,23 @@
   .empty { color: var(--muted); text-align: center; padding: 60px 0; }
 
 
+  /* ---------- sync ---------- */
+  .syncbtn { margin-top: auto; display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 8px; color: var(--muted); font-size: 13px; text-align: left; }
+  .syncbtn:hover { background: var(--hover); color: var(--text); }
+  .syncbtn .cloud { font-size: 15px; }
+  .syncbtn.err { color: var(--c3); }
+  .syncbtn + .foot { margin-top: 0; }
+  dialog.auth { border: 1px solid var(--line); border-radius: 14px; background: var(--chip); color: var(--text); padding: 20px; width: min(340px, calc(100vw - 32px)); box-shadow: 0 16px 48px rgba(0,0,0,.35); }
+  dialog.auth::backdrop { background: rgba(0,0,0,.45); }
+  dialog.auth h3 { margin: 0 0 12px; font-size: 17px; }
+  dialog.auth p { margin: 0 0 12px; color: var(--muted); font-size: 13px; }
+  dialog.auth input { width: 100%; margin-bottom: 8px; border: 0; border-radius: 8px; padding: 9px 10px; background: var(--hover); font: inherit; color: inherit; outline: none; }
+  dialog.auth .err { color: var(--c1); font-size: 13px; min-height: 18px; margin-bottom: 6px; }
+  dialog.auth .btns { display: flex; gap: 8px; }
+  dialog.auth .btns button { flex: 1; padding: 8px 10px; border-radius: 8px; background: var(--hover); }
+  dialog.auth .btns button:hover { background: var(--active); }
+  dialog.auth .btns .primary { background: var(--blue); color: #fff; }
+
   /* ---------- today ---------- */
   .nav.drop { background: color-mix(in srgb, var(--blue) 22%, transparent); outline: 2px solid var(--blue); }
   .nav[data-view="today"] .ico svg { stroke: var(--c3); }
@@ -213,6 +236,7 @@
     .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
     .sidebar { flex-direction: row; align-items: center; overflow-x: auto; overflow-y: hidden; padding: 8px 10px; gap: 4px; border-right: 0; border-bottom: 1px solid var(--line); }
     .brand, .search, .sep, .foot { display: none; }
+    .syncbtn { margin-top: 0; margin-left: auto; flex: none; white-space: nowrap; }
     .nav { width: auto; flex: none; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
     .nav .ct { display: none; }
     .mh { padding: 14px 16px 4px; }
@@ -234,6 +258,7 @@
     <div class="brand">四象限</div>
     <input class="search" id="search" type="search" placeholder="搜索" autocomplete="off">
     <nav id="nav" style="display:contents"></nav>
+    <button class="syncbtn" id="syncBtn" type="button"><span class="cloud">☁</span><span id="syncText">登录同步</span></button>
     <div class="foot">
       <button id="exportBtn" type="button">导出</button>
       <button id="importBtn" type="button">导入</button>
@@ -252,6 +277,30 @@
   </main>
 </div>
 
+<dialog class="auth" id="authDlg">
+  <h3 id="authTitle">登录以同步</h3>
+  <div id="authOut">
+    <p>登录后,Mac 和 iPhone 上的任务会自动同步。</p>
+    <input id="authEmail" type="email" placeholder="邮箱" autocomplete="email">
+    <input id="authPw" type="password" placeholder="密码(至少 6 位)" autocomplete="current-password">
+    <div class="err" id="authErr"></div>
+    <div class="btns">
+      <button id="loginBtn" class="primary" type="button">登录</button>
+      <button id="signupBtn" type="button">注册</button>
+      <button id="authClose" type="button">取消</button>
+    </div>
+  </div>
+  <div id="authIn" hidden>
+    <p id="authWho"></p>
+    <div class="btns">
+      <button id="syncNowBtn" class="primary" type="button">立即同步</button>
+      <button id="logoutBtn" type="button">退出登录</button>
+      <button id="authClose2" type="button">关闭</button>
+    </div>
+  </div>
+</dialog>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const QUADS = {
   q1: { name: '重要且紧急',   short: '立刻做', color: 'var(--c1)' },
@@ -280,6 +329,8 @@ function normalize(raw) {
   }
   return { id: raw.id || uid(), text: raw.text, q, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null,
     today: !!raw.today,
+    ord: typeof raw.ord === 'number' ? raw.ord : null,
+    u: typeof raw.u === 'number' ? raw.u : (raw.created || 0),
     due: typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : null };
 }
 function load() {
@@ -294,9 +345,47 @@ function load() {
   }
   return [];
 }
-function save() { try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch (e) {} }
 
 let tasks = load();
+
+/* ---------- change tracking (for sync) ---------- */
+const TOMB_KEY = 'quadrant-board:tombs', DIRTY_KEY = 'quadrant-board:dirty';
+const taskContent = t => ({ text: t.text, q: t.q, done: t.done, due: t.due, today: t.today, created: t.created, doneAt: t.doneAt, ord: t.ord });
+const readJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
+let tombs = readJSON(TOMB_KEY, []);
+const dirty = new Set(readJSON(DIRTY_KEY, []));
+if (tasks.some(t => t.ord == null)) tasks.forEach((t, i) => { if (t.ord == null) t.ord = i; });
+const syncSnap = new Map(tasks.map(t => [t.id, JSON.stringify(taskContent(t))]));
+
+function persist() {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(tasks));
+    localStorage.setItem(TOMB_KEY, JSON.stringify(tombs));
+    localStorage.setItem(DIRTY_KEY, JSON.stringify([...dirty]));
+  } catch (e) {}
+}
+/* every mutation calls save(): diff against the last snapshot, stamp changed tasks, record deletions */
+function save() {
+  tasks.forEach((t, i) => { t.ord = i; });
+  const now = Date.now(), seen = new Set();
+  for (const t of tasks) {
+    seen.add(t.id);
+    const c = JSON.stringify(taskContent(t));
+    if (syncSnap.get(t.id) !== c) {
+      t.u = now; syncSnap.set(t.id, c); dirty.add(t.id);
+      tombs = tombs.filter(x => x.id !== t.id);
+    }
+  }
+  for (const id of [...syncSnap.keys()]) {
+    if (!seen.has(id)) {
+      syncSnap.delete(id);
+      tombs = tombs.filter(x => x.id !== id);
+      tombs.push({ id, u: now }); dirty.add(id);
+    }
+  }
+  persist();
+  if (typeof schedulePush === 'function') schedulePush();
+}
 let view = 'plane';
 try { const v = localStorage.getItem('quadrant-board:view'); if (v === 'plane' || v === 'done' || v === 'cal' || v === 'today' || QUADS[v]) view = v; } catch (e) {}
 let query = '';
@@ -809,6 +898,176 @@ importFile.addEventListener('change', async () => {
     if (confirm(`导入 ${clean.length} 个任务,将覆盖当前数据,继续?`)) { tasks = clean; save(); render(); }
   } catch (e) { alert('导入失败:文件格式不正确'); }
 });
+
+/* ---------- cloud sync (Supabase, local-first) ---------- */
+const SUPABASE_URL = 'https://ywmvhnxnrlxitmzjyedi.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_MUuRsuqtP8w42jMFcHT_hw_DVpGJynx'; // publishable key: safe to ship, data is protected by RLS
+let sb = null, user = null, channel = null, pushing = false, pushTimer = 0, syncState = 'off';
+try {
+  if (window.supabase) sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+} catch (e) { sb = null; }
+
+function setSync(state) {
+  syncState = state;
+  const btn = $('syncBtn'), txt = $('syncText');
+  btn.classList.toggle('err', state === 'error' || state === 'offline');
+  txt.textContent = !user ? '登录同步'
+    : state === 'syncing' ? '同步中…'
+    : state === 'offline' ? '离线,稍后重试'
+    : state === 'error' ? '同步失败,点击查看'
+    : '已同步';
+}
+
+function busyEditing() {
+  const a = document.activeElement;
+  return !!document.querySelector('.chip.drag') || (a && a.isContentEditable);
+}
+let renderTimer = 0;
+function renderSoon() {
+  clearTimeout(renderTimer);
+  renderTimer = setTimeout(function again() {
+    if (busyEditing()) { renderTimer = setTimeout(again, 600); return; }
+    render();
+  }, 60);
+}
+
+function applyRows(rows) {
+  let changed = false;
+  for (const r of rows) {
+    const local = tasks.find(t => t.id === r.id);
+    const tomb = tombs.find(x => x.id === r.id);
+    const lu = local ? local.u : tomb ? tomb.u : -1;
+    if (r.updated_at <= lu) { if (r.updated_at < lu) dirty.add(r.id); continue; }
+    if (r.deleted) {
+      if (local) { tasks = tasks.filter(t => t.id !== r.id); syncSnap.delete(r.id); changed = true; }
+      tombs = tombs.filter(x => x.id !== r.id); tombs.push({ id: r.id, u: r.updated_at });
+    } else {
+      const nt = normalize({ ...r.data, id: r.id, u: r.updated_at });
+      if (!nt) continue;
+      nt.u = r.updated_at;
+      if (local) tasks[tasks.indexOf(local)] = nt; else tasks.push(nt);
+      tombs = tombs.filter(x => x.id !== r.id);
+      syncSnap.set(r.id, JSON.stringify(taskContent(nt)));
+      dirty.delete(r.id);
+      changed = true;
+    }
+  }
+  if (changed) {
+    tasks.sort((a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || a.created - b.created);
+    persist();
+    renderSoon();
+  }
+}
+
+async function pull() {
+  if (!sb || !user) return;
+  const { data, error } = await sb.from('tasks').select('id,data,updated_at,deleted');
+  if (error) { setSync(navigator.onLine ? 'error' : 'offline'); return; }
+  applyRows(data);
+  const have = new Set(data.map(r => r.id));
+  for (const t of tasks) if (!have.has(t.id)) dirty.add(t.id);
+  for (const x of tombs) if (!have.has(x.id)) dirty.add(x.id);
+  persist();
+  await push();
+}
+
+function schedulePush() {
+  if (!sb || !user) return;
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(push, 400);
+}
+async function push() {
+  if (!sb || !user || pushing) return;
+  if (!dirty.size) { setSync(navigator.onLine ? 'ok' : 'offline'); return; }
+  pushing = true; setSync('syncing');
+  const sent = new Map(), rows = [];
+  for (const id of dirty) {
+    const t = tasks.find(x => x.id === id);
+    if (t) { rows.push({ user_id: user.id, id, data: taskContent(t), updated_at: t.u, deleted: false }); sent.set(id, t.u); continue; }
+    const x = tombs.find(z => z.id === id);
+    if (x) { rows.push({ user_id: user.id, id, data: {}, updated_at: x.u, deleted: true }); sent.set(id, x.u); }
+    else dirty.delete(id);
+  }
+  let failed = false;
+  if (rows.length) {
+    try {
+      const { error } = await sb.from('tasks').upsert(rows, { onConflict: 'user_id,id' });
+      failed = !!error;
+      if (!error) for (const [id, u] of sent) {
+        const t = tasks.find(x => x.id === id), x = tombs.find(z => z.id === id);
+        if ((t ? t.u : x && x.u) === u) dirty.delete(id);
+      }
+    } catch (e) { failed = true; }
+  }
+  persist();
+  pushing = false;
+  if (failed) { setSync(navigator.onLine ? 'error' : 'offline'); return; }
+  if (dirty.size) { schedulePush(); return; }
+  setSync('ok');
+}
+
+function startSync() {
+  if (!sb || !user) return;
+  setSync('syncing');
+  pull();
+  if (channel) sb.removeChannel(channel);
+  channel = sb.channel('tasks-' + user.id)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks', filter: `user_id=eq.${user.id}` }, p => {
+      const r = p.new;
+      if (r && r.id) applyRows([r]);
+    })
+    .subscribe();
+}
+function stopSync() {
+  if (channel && sb) { sb.removeChannel(channel); channel = null; }
+}
+
+if (sb) {
+  sb.auth.onAuthStateChange((ev, session) => {
+    const prev = user && user.id;
+    user = session ? session.user : null;
+    setSync(user ? 'ok' : 'off');
+    if (user && user.id !== prev) startSync();
+    if (!user) stopSync();
+  });
+  const wake = () => { if (user && document.visibilityState !== 'hidden') pull(); };
+  document.addEventListener('visibilitychange', wake);
+  window.addEventListener('online', wake);
+  window.addEventListener('focus', wake);
+}
+
+/* ---- login dialog ---- */
+const dlg = $('authDlg');
+function showAuth() {
+  $('authErr').textContent = '';
+  $('authOut').hidden = !!user; $('authIn').hidden = !user;
+  $('authTitle').textContent = user ? '云同步' : '登录以同步';
+  if (user) $('authWho').textContent = `已登录:${user.email}` + (syncState === 'error' ? '(上次同步失败,请重试)' : '');
+  if (!dlg.open) dlg.showModal();
+}
+$('syncBtn').addEventListener('click', () => {
+  if (!sb) { alert('同步组件加载失败,请检查网络后刷新页面。'); return; }
+  showAuth();
+});
+for (const id of ['authClose', 'authClose2']) $(id).addEventListener('click', () => dlg.close());
+async function doAuth(signup) {
+  const email = $('authEmail').value.trim(), password = $('authPw').value;
+  const err = $('authErr'); err.textContent = '';
+  if (!email || password.length < 6) { err.textContent = '请输入邮箱和至少 6 位的密码'; return; }
+  const { data, error } = signup ? await sb.auth.signUp({ email, password }) : await sb.auth.signInWithPassword({ email, password });
+  if (error) { err.textContent = error.message; return; }
+  if (!data.session) { err.textContent = '注册成功,请到邮箱点击确认链接后再登录'; return; }
+  dlg.close();
+}
+$('loginBtn').addEventListener('click', () => doAuth(false));
+$('signupBtn').addEventListener('click', () => doAuth(true));
+$('authPw').addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(false); });
+$('syncNowBtn').addEventListener('click', async () => { dlg.close(); await pull(); });
+$('logoutBtn').addEventListener('click', async () => { await sb.auth.signOut(); dlg.close(); });
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 
 render();
 </script>
