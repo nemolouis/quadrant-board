@@ -173,7 +173,13 @@
   .chip.settle { transition: transform .26s cubic-bezier(.2,.9,.25,1), box-shadow .26s ease, opacity .26s ease; }
   .today-stage { flex: 1; min-height: 0; display: flex; overflow-y: auto; scrollbar-width: none; padding: 24px 0; user-select: none; -webkit-user-select: none; }
   .today-stage::-webkit-scrollbar { display: none; }
-  .today-stage .stack { gap: 10px; }
+  .today-stage .stack { gap: 14px; }
+  .today-stage .chip { font-size: 20px; padding: 11px 22px 11px 14px; gap: 12px; }
+  .today-stage .check { width: 28px; height: 28px; border-width: 2px; }
+  .today-stage .done .check::after { left: 8.5px; top: 3.5px; width: 7px; height: 13px; border-width: 0 2.5px 2.5px 0; }
+  .today-stage .datebtn { font-size: 14px; padding: 4px 9px; }
+  .today-stage .datebtn svg { width: 17px; height: 17px; }
+  .today-stage .rmtoday { font-size: 22px; }
   .chip.static { cursor: default; touch-action: auto; }
   .chip .rmtoday { display: none; color: var(--muted); font-size: 16px; line-height: 1; padding: 0 2px; flex: none; }
   .chip:hover .rmtoday { display: block; }
