@@ -183,8 +183,8 @@
   .chip.ghost.fly { transition: transform .24s cubic-bezier(.2,.9,.25,1), opacity .24s ease; opacity: 0; }
 
   /* ---------- sub-list board ---------- */
-  .board { flex: 1; min-height: 0; display: flex; gap: 14px; overflow-x: auto; padding: 4px 28px 24px; align-items: flex-start; }
-  .col { flex: 0 0 280px; max-height: 100%; display: flex; flex-direction: column; background: var(--sidebar); border-radius: 12px; padding: 10px 12px 8px; }
+  .board { flex: 1; min-height: 0; display: flex; gap: 14px; overflow-x: auto; padding: 4px 28px 24px; align-items: stretch; }
+  .col { flex: 1 1 0; min-width: 200px; display: flex; flex-direction: column; background: var(--sidebar); border-radius: 12px; padding: 10px 12px 8px; }
   .col-h { display: flex; align-items: center; gap: 6px; padding: 2px 2px 6px; font-weight: 600; }
   .coln { flex: 1; min-width: 2ch; outline: none; border-radius: 5px; padding: 0 3px; margin-left: -3px; }
   .coln[contenteditable]:hover, .coln[contenteditable]:focus { background: var(--hover); }
@@ -197,7 +197,7 @@
   .colbody::-webkit-scrollbar { display: none; }
   .col .row-t .grip { left: -14px; }
   .col .addrow { padding: 8px 0 2px 14px; }
-  .addcol { flex: 0 0 200px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px; color: var(--muted); text-align: center; }
+  .addcol { flex: 0 0 40px; align-self: flex-start; font-size: 22px; line-height: 1; padding: 12px 0 !important; border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px; color: var(--muted); text-align: center; }
   .addcol:hover { color: var(--text); border-color: var(--muted); }
 
   /* ---------- today ---------- */
@@ -282,7 +282,7 @@
     .addlist { width: 28px; height: 28px; background: var(--hover); }
     .grip { left: -14px; }
     .board { padding: 4px 12px 16px; }
-    .col { flex-basis: 78vw; }
+    .col { flex: 0 0 78vw; min-width: 0; }
     .syncbtn { margin-top: 0; margin-left: auto; flex: none; white-space: nowrap; }
     .nav { width: auto; flex: none; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
     .nav .ct { display: none; }
@@ -1015,7 +1015,7 @@ function renderBoard(list) {
     }));
     board.append(col);
   }
-  board.append(h('button', { class: 'addcol', type: 'button', onclick: newSection }, '+ 添加子列表'));
+  board.append(h('button', { class: 'addcol', type: 'button', title: '添加子列表', 'aria-label': '添加子列表', onclick: newSection }, '+'));
   return board;
 }
 
