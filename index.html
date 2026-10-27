@@ -175,6 +175,7 @@
   .mh h1[contenteditable]:hover { background: var(--hover); }
   .mh h1[contenteditable]:focus { background: var(--hover); }
   .row-t { position: relative; }
+  .row-t.dragging { opacity: .35; }
   .grip { position: absolute; left: -22px; top: 11px; width: 16px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1; letter-spacing: -2px; opacity: 0; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; }
   .row-t:hover .grip { opacity: .8; }
   @media (hover: none) { .grip { opacity: .5; } }
@@ -672,32 +673,64 @@ function applyDrop(t, v) {
   else if (QUADS[v]) { if (t.q !== v) moveTask(t, v, 1e9); }
   else if (isListView(v)) { if (t.list !== v) moveToList(t, v); }
 }
+/* live reorder of rows inside a list view while dragging */
+function reorderRow(row, y) {
+  const box = row.parentNode;
+  const others = [...box.querySelectorAll('.row-t')].filter(r => r !== row);
+  const idx = others.filter(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2 < y; }).length;
+  const rows = [...box.querySelectorAll('.row-t')];
+  if (rows.indexOf(row) === idx) return;
+  const first = snapshot(box, row);
+  box.insertBefore(row, others[idx] || box.querySelector('.addrow'));
+  flip(box, first, row);
+}
+/* write the DOM row order back into the tasks array (same slots, new order) */
+function commitRowOrder(box) {
+  const order = [...box.querySelectorAll('.row-t')].map(r => tasks.find(t => t.id === r.dataset.id)).filter(Boolean);
+  const slots = order.map(t => tasks.indexOf(t)).sort((a, b) => a - b);
+  if (order.every((t, i) => tasks[slots[i]] === t)) return;
+  order.forEach((t, i) => { tasks[slots[i]] = t; });
+  save();
+  render();
+}
 function bindRowDrag(grip, t) {
   let st = null;
   grip.addEventListener('pointerdown', e => {
     if (e.button !== 0) return;
     e.preventDefault();
-    grip.setPointerCapture(e.pointerId);
+    // listen on window: the row is re-inserted while reordering, which would drop pointer capture
     st = { sx: e.clientX, sy: e.clientY, active: false, ghost: null };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', end);
+    window.addEventListener('pointercancel', end);
   });
-  grip.addEventListener('pointermove', e => {
+  const move = e => {
     if (!st) return;
     if (!st.active) {
       if (Math.hypot(e.clientX - st.sx, e.clientY - st.sy) < 4) return;
       st.active = true;
+      st.row = grip.closest('.row-t');
+      if (st.row) st.row.classList.add('dragging');
       st.ghost = h('div', { class: 'chip ghost', style: `--c:${qinfo(t).color}` }, h('span', { class: 'check' }), h('span', { class: 't' }, t.text));
       document.body.append(st.ghost);
     }
     st.x = e.clientX; st.y = e.clientY;
     st.ghost.style.transform = `translate3d(${e.clientX - 24}px,${e.clientY - 18}px,0)`;
-    markNav(navAt(e.clientX, e.clientY));
-  });
+    const nv = navAt(e.clientX, e.clientY);
+    markNav(nv);
+    if (!nv && st.row) reorderRow(st.row, e.clientY);
+  };
   const end = e => {
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
     if (!st) return;
     const s = st; st = null;
     if (!s.active) return;
     const target = navAt(e.clientX, e.clientY);
     markNav(null);
+    if (s.row) s.row.classList.remove('dragging');
+    if (!target && s.row) commitRowOrder(s.row.parentNode);
     if (target) {
       const nr = target.getBoundingClientRect();
       s.ghost.classList.add('fly');
@@ -710,8 +743,6 @@ function bindRowDrag(grip, t) {
       setTimeout(() => s.ghost.remove(), 260);
     }
   };
-  grip.addEventListener('pointerup', end);
-  grip.addEventListener('pointercancel', end);
 }
 
 function chipEl(t, plane, opts = {}) {
