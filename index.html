@@ -182,6 +182,24 @@
   .chip.ghost { position: fixed; left: 0; top: 0; z-index: 80; pointer-events: none; max-width: 280px; box-shadow: 0 10px 28px rgba(0,0,0,.3); cursor: grabbing; }
   .chip.ghost.fly { transition: transform .24s cubic-bezier(.2,.9,.25,1), opacity .24s ease; opacity: 0; }
 
+  /* ---------- sub-list board ---------- */
+  .board { flex: 1; min-height: 0; display: flex; gap: 14px; overflow-x: auto; padding: 4px 28px 24px; align-items: flex-start; }
+  .col { flex: 0 0 280px; max-height: 100%; display: flex; flex-direction: column; background: var(--sidebar); border-radius: 12px; padding: 10px 12px 8px; }
+  .col-h { display: flex; align-items: center; gap: 6px; padding: 2px 2px 6px; font-weight: 600; }
+  .coln { flex: 1; min-width: 2ch; outline: none; border-radius: 5px; padding: 0 3px; margin-left: -3px; }
+  .coln[contenteditable]:hover, .coln[contenteditable]:focus { background: var(--hover); }
+  .colct { color: var(--muted); font-size: 12px; font-weight: 400; }
+  .colmv, .colrm { display: none; color: var(--muted); font-size: 15px; line-height: 1; padding: 0 3px; border-radius: 4px; }
+  .col:hover .colmv, .col:hover .colrm { display: inline; }
+  .colmv:hover, .colrm:hover { background: var(--active); color: var(--text); }
+  .colmv:disabled { opacity: .3; cursor: default; }
+  .colbody { flex: 1; min-height: 44px; overflow-y: auto; padding-left: 14px; scrollbar-width: none; }
+  .colbody::-webkit-scrollbar { display: none; }
+  .col .row-t .grip { left: -14px; }
+  .col .addrow { padding: 8px 0 2px 14px; }
+  .addcol { flex: 0 0 200px; border: 1.5px dashed var(--line); border-radius: 12px; padding: 12px; color: var(--muted); text-align: center; }
+  .addcol:hover { color: var(--text); border-color: var(--muted); }
+
   /* ---------- today ---------- */
   .nav.drop { background: color-mix(in srgb, var(--blue) 22%, transparent); outline: 2px solid var(--blue); }
   .nav[data-view="today"] .ico svg { stroke: var(--c3); }
@@ -263,6 +281,8 @@
     .sec span { display: none; }
     .addlist { width: 28px; height: 28px; background: var(--hover); }
     .grip { left: -14px; }
+    .board { padding: 4px 12px 16px; }
+    .col { flex-basis: 78vw; }
     .syncbtn { margin-top: 0; margin-left: auto; flex: none; white-space: nowrap; }
     .nav { width: auto; flex: none; padding: 6px 12px; border-radius: 999px; white-space: nowrap; }
     .nav .ct { display: none; }
@@ -298,6 +318,7 @@
       <span class="sub" id="sub"></span>
       <span class="spacer"></span>
       <button class="tx" id="clearBtn" type="button" hidden>清除全部</button>
+      <button class="tx" id="addSecBtn" type="button" hidden>添加子列表</button>
       <button class="tx danger" id="delListBtn" type="button" hidden>删除清单</button>
       <button class="plus" id="addBtn" type="button" title="新建" aria-label="新建">+</button>
     </header>
@@ -359,11 +380,16 @@ function normalize(raw) {
       } else return null;
     }
   } else list = null;
-  return { id: raw.id || uid(), text: raw.text, q, list, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null,
+  return { id: raw.id || uid(), text: raw.text, q, list, sec: list && typeof raw.sec === 'string' ? raw.sec : null, done: !!raw.done, created: raw.created || Date.now(), doneAt: raw.doneAt || null,
     today: !!raw.today,
     ord: typeof raw.ord === 'number' ? raw.ord : null,
     u: typeof raw.u === 'number' ? raw.u : (raw.created || 0),
     due: typeof raw.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw.due) ? raw.due : null };
+}
+function normalizeSec(raw) {
+  if (!raw || typeof raw.id !== 'string' || typeof raw.list !== 'string') return null;
+  return { id: raw.id, kind: 'sec', list: raw.list, name: String(raw.name || '子列表').slice(0, 60),
+    ord: typeof raw.ord === 'number' ? raw.ord : null, u: typeof raw.u === 'number' ? raw.u : 0 };
 }
 function normalizeList(raw) {
   if (!raw || typeof raw.id !== 'string') return null;
@@ -388,23 +414,27 @@ let tasks = load();
 
 /* ---------- change tracking (for sync) ---------- */
 const TOMB_KEY = 'quadrant-board:tombs', DIRTY_KEY = 'quadrant-board:dirty';
-const LISTS_KEY = 'quadrant-board:lists';
-const taskContent = t => ({ text: t.text, q: t.q, list: t.list, done: t.done, due: t.due, today: t.today, created: t.created, doneAt: t.doneAt, ord: t.ord });
+const LISTS_KEY = 'quadrant-board:lists', SECS_KEY = 'quadrant-board:secs';
+const taskContent = t => ({ text: t.text, q: t.q, list: t.list, sec: t.sec, done: t.done, due: t.due, today: t.today, created: t.created, doneAt: t.doneAt, ord: t.ord });
 const readJSON = (k, d) => { try { const v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } };
-const itemContent = x => x.kind === 'list' ? { kind: 'list', name: x.name, ord: x.ord } : taskContent(x);
+const itemContent = x => x.kind === 'list' ? { kind: 'list', name: x.name, ord: x.ord }
+  : x.kind === 'sec' ? { kind: 'sec', list: x.list, name: x.name, ord: x.ord } : taskContent(x);
 let lists = readJSON(LISTS_KEY, []).map(normalizeList).filter(Boolean);
-const allItems = () => [...tasks, ...lists];
-const findItem = id => tasks.find(t => t.id === id) || lists.find(l => l.id === id);
+let secs = readJSON(SECS_KEY, []).map(normalizeSec).filter(Boolean);
+const allItems = () => [...tasks, ...lists, ...secs];
+const findItem = id => tasks.find(t => t.id === id) || lists.find(l => l.id === id) || secs.find(x => x.id === id);
 let tombs = readJSON(TOMB_KEY, []);
 const dirty = new Set(readJSON(DIRTY_KEY, []));
 if (tasks.some(t => t.ord == null)) tasks.forEach((t, i) => { if (t.ord == null) t.ord = i; });
 if (lists.some(l => l.ord == null)) lists.forEach((l, i) => { if (l.ord == null) l.ord = i; });
+if (secs.some(x => x.ord == null)) secs.forEach((x, i) => { if (x.ord == null) x.ord = i; });
 const syncSnap = new Map(allItems().map(x => [x.id, JSON.stringify(itemContent(x))]));
 
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(tasks));
     localStorage.setItem(LISTS_KEY, JSON.stringify(lists));
+    localStorage.setItem(SECS_KEY, JSON.stringify(secs));
     localStorage.setItem(TOMB_KEY, JSON.stringify(tombs));
     localStorage.setItem(DIRTY_KEY, JSON.stringify([...dirty]));
   } catch (e) {}
@@ -413,6 +443,7 @@ function persist() {
 function save() {
   tasks.forEach((t, i) => { t.ord = i; });
   lists.forEach((l, i) => { l.ord = i; });
+  secs.forEach((x, i) => { x.ord = i; });
   const now = Date.now(), seen = new Set();
   for (const t of allItems()) {
     seen.add(t.id);
@@ -438,11 +469,14 @@ let query = '';
 let pendingEdit = null;
 let pendingFocusAdd = false;
 let pendingTitleEdit = false;
+let pendingSecEdit = null;
+let pendingFocusSel = null;
 
 const $ = id => document.getElementById(id);
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
   for (const [k, v] of Object.entries(props || {})) {
+    if (v == null) continue;
     if (k === 'class') el.className = v;
     else if (k === 'html') el.innerHTML = v;
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
@@ -459,7 +493,7 @@ function qinfo(t) {
   return { name: l ? l.name : '清单', short: '清单', color: 'var(--cl)' };
 }
 function addTask(q, text, due, listId) {
-  const t = { id: uid(), text: text || '', q: q || null, list: listId || null, done: false, created: Date.now(), doneAt: null, due: due || null };
+  const t = { id: uid(), text: text || '', q: q || null, list: listId || null, sec: null, done: false, created: Date.now(), doneAt: null, due: due || null };
   tasks.push(t);
   return t;
 }
@@ -470,7 +504,7 @@ function removeTask(t) { tasks = tasks.filter(x => x !== t); save(); render(); }
 function moveTask(t, q, idx) {
   const rest = tasks.filter(x => x !== t && !x.done && x.q === q);
   tasks = tasks.filter(x => x !== t);
-  t.q = q; t.list = null;
+  t.q = q; t.list = null; t.sec = null;
   if (idx < rest.length) tasks.splice(tasks.indexOf(rest[idx]), 0, t);
   else if (rest.length) tasks.splice(tasks.indexOf(rest[rest.length - 1]) + 1, 0, t);
   else tasks.push(t);
@@ -586,6 +620,7 @@ function renderMain() {
   else { title.removeAttribute('contenteditable'); title.removeAttribute('title'); }
   $('sub').textContent = searching || view === 'plane' || view === 'done' || view === 'today' || lst ? `${list.length} 项` : view === 'cal' ? `${list.length} 项有截止日期` : `${QUADS[view].short} · ${list.length} 项`;
   $('delListBtn').hidden = !(lst && !searching);
+  $('addSecBtn').hidden = !(lst && !searching);
   $('clearBtn').hidden = !(view === 'done' && !searching && list.length);
   $('addBtn').hidden = searching || view === 'done' || view === 'cal';
 
@@ -596,15 +631,19 @@ function renderMain() {
   else content.append(renderList(list, searching));
 
   if (pendingTitleEdit) { pendingTitleEdit = false; if (lst) startEdit(title); }
-  else if (pendingEdit) {
+  else if (pendingSecEdit) {
+    const el = content.querySelector(`.col[data-sec="${pendingSecEdit}"] .coln`);
+    pendingSecEdit = null;
+    if (el) startEdit(el);
+  } else if (pendingEdit) {
     const el = content.querySelector(`[data-id="${pendingEdit}"] .t`);
     pendingEdit = null;
     if (el) startEdit(el);
   } else if (pendingFocusAdd) {
-    const inp = content.querySelector('.addrow input');
+    const inp = content.querySelector(pendingFocusSel || '.addrow input');
     if (inp) inp.focus();
   }
-  pendingFocusAdd = false;
+  pendingFocusAdd = false; pendingFocusSel = null;
 }
 
 /* ---- plane ---- */
@@ -664,7 +703,7 @@ function markNav(el) {
 }
 function moveToList(t, id) {
   tasks = tasks.filter(x => x !== t);
-  t.q = null; t.list = id;
+  t.q = null; t.list = id; t.sec = null;
   tasks.push(t);
   save();
 }
@@ -673,22 +712,43 @@ function applyDrop(t, v) {
   else if (QUADS[v]) { if (t.q !== v) moveTask(t, v, 1e9); }
   else if (isListView(v)) { if (t.list !== v) moveToList(t, v); }
 }
-/* live reorder of rows inside a list view while dragging */
-function reorderRow(row, y) {
-  const box = row.parentNode;
-  const others = [...box.querySelectorAll('.row-t')].filter(r => r !== row);
+/* live reorder of rows while dragging; in board mode rows can also hop between columns */
+function reorderRow(row, x, y) {
+  const root = row.closest('.listview, .board');
+  if (!root) return;
+  let body = row.parentNode;
+  if (root.classList.contains('board')) {
+    let best = null, bd = Infinity;
+    for (const c of root.querySelectorAll('.col[data-sec]')) {
+      const r = c.getBoundingClientRect();
+      const d = x < r.left ? r.left - x : x > r.right ? x - r.right : 0;
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (best) body = best.querySelector('.colbody');
+  }
+  const others = [...body.querySelectorAll('.row-t')].filter(r => r !== row);
   const idx = others.filter(r => { const b = r.getBoundingClientRect(); return b.top + b.height / 2 < y; }).length;
-  const rows = [...box.querySelectorAll('.row-t')];
-  if (rows.indexOf(row) === idx) return;
-  const first = snapshot(box, row);
-  box.insertBefore(row, others[idx] || box.querySelector('.addrow'));
-  flip(box, first, row);
+  const rows = [...body.querySelectorAll('.row-t')];
+  if (row.parentNode === body && rows.indexOf(row) === idx) return;
+  const first = snapshot(root, row);
+  body.insertBefore(row, others[idx] || body.querySelector('.addrow'));
+  flip(root, first, row);
 }
-/* write the DOM row order back into the tasks array (same slots, new order) */
-function commitRowOrder(box) {
-  const order = [...box.querySelectorAll('.row-t')].map(r => tasks.find(t => t.id === r.dataset.id)).filter(Boolean);
+/* write the DOM order (and column membership) back into the tasks array */
+function commitRowOrder(root) {
+  const board = root.classList.contains('board');
+  const groups = board
+    ? [...root.querySelectorAll('.col[data-sec]')].map(c => ({ sec: c.dataset.sec || null, rows: [...c.querySelectorAll('.colbody .row-t')] }))
+    : [{ sec: undefined, rows: [...root.querySelectorAll('.row-t')] }];
+  const order = []; let secChanged = false;
+  for (const g of groups) for (const r of g.rows) {
+    const t = tasks.find(x => x.id === r.dataset.id);
+    if (!t) continue;
+    if (g.sec !== undefined && (t.sec || null) !== g.sec) { t.sec = g.sec; secChanged = true; }
+    order.push(t);
+  }
   const slots = order.map(t => tasks.indexOf(t)).sort((a, b) => a - b);
-  if (order.every((t, i) => tasks[slots[i]] === t)) return;
+  if (!secChanged && order.every((t, i) => tasks[slots[i]] === t)) return;
   order.forEach((t, i) => { tasks[slots[i]] = t; });
   save();
   render();
@@ -718,7 +778,7 @@ function bindRowDrag(grip, t) {
     st.ghost.style.transform = `translate3d(${e.clientX - 24}px,${e.clientY - 18}px,0)`;
     const nv = navAt(e.clientX, e.clientY);
     markNav(nv);
-    if (!nv && st.row) reorderRow(st.row, e.clientY);
+    if (!nv && st.row) reorderRow(st.row, e.clientX, e.clientY);
   };
   const end = e => {
     window.removeEventListener('pointermove', move);
@@ -730,7 +790,7 @@ function bindRowDrag(grip, t) {
     const target = navAt(e.clientX, e.clientY);
     markNav(null);
     if (s.row) s.row.classList.remove('dragging');
-    if (!target && s.row) commitRowOrder(s.row.parentNode);
+    if (!target && s.row) commitRowOrder(s.row.closest('.listview, .board'));
     if (target) {
       const nr = target.getBoundingClientRect();
       s.ghost.classList.add('fly');
@@ -854,43 +914,109 @@ function chipEl(t, plane, opts = {}) {
 }
 
 /* ---- list ---- */
+function rowEl(t, showTag) {
+  const text = h('div', { class: 't', contenteditable: PLAIN ? 'plaintext-only' : 'true' }, t.text);
+  bindEditing(t, text);
+  const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成', onclick: () => toggleDone(t) });
+  const grip = h('span', { class: 'grip', title: '拖动调整顺序,或拖到左侧菜单移动', html: '⋮⋮' });
+  bindRowDrag(grip, t);
+  return h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${qinfo(t).color}` },
+    t.done ? null : grip,
+    check,
+    h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, qinfo(t).name) : null),
+    dateControl(t),
+    view === 'today' ? null : h('button', {
+      class: 'todaybtn' + (t.today ? ' on' : ''), type: 'button', title: t.today ? '移出今日' : '加入今日', html: TODAYICON,
+      onclick: () => { t.today = !t.today; save(); render(); } }),
+    view === 'today'
+      ? h('button', { class: 'del', type: 'button', title: '移出今日', 'aria-label': '移出今日', onclick: () => { t.today = false; save(); render(); } }, '×')
+      : h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×'));
+}
+function addRow(onAdd) {
+  const input = h('input', { placeholder: '新任务', autocomplete: 'off' });
+  input.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    const v = input.value.trim();
+    if (!v) return;
+    onAdd(v);
+  });
+  return h('div', { class: 'addrow' }, h('span', { class: 'ring' }), input);
+}
+
 function renderList(list, searching) {
+  if (isListView(view) && !searching && secs.some(x => x.list === view)) return renderBoard(list);
   const box = h('div', { class: 'listview' });
   const showTag = view === 'done' || view === 'today' || searching;
-  for (const t of list) {
-    const text = h('div', { class: 't', contenteditable: PLAIN ? 'plaintext-only' : 'true' }, t.text);
-    bindEditing(t, text);
-    const check = h('span', { class: 'check', role: 'checkbox', 'aria-label': '完成', onclick: () => toggleDone(t) });
-    const grip = h('span', { class: 'grip', title: '拖到左侧菜单可移动', html: '⋮⋮' });
-    bindRowDrag(grip, t);
-    box.append(h('div', { class: 'row-t' + (t.done ? ' done' : ''), 'data-id': t.id, style: `--c:${qinfo(t).color}` },
-      t.done ? null : grip,
-      check,
-      h('div', { class: 'body' }, text, showTag ? h('div', { class: 'tag' }, qinfo(t).name) : null),
-      dateControl(t),
-      view === 'today' ? null : h('button', {
-        class: 'todaybtn' + (t.today ? ' on' : ''), type: 'button', title: t.today ? '移出今日' : '加入今日', html: TODAYICON,
-        onclick: () => { t.today = !t.today; save(); render(); } }),
-      view === 'today'
-        ? h('button', { class: 'del', type: 'button', title: '移出今日', 'aria-label': '移出今日', onclick: () => { t.today = false; save(); render(); } }, '×')
-        : h('button', { class: 'del', type: 'button', title: '删除', 'aria-label': '删除', onclick: () => removeTask(t) }, '×')));
-  }
+  for (const t of list) box.append(rowEl(t, showTag));
   if (!list.length) box.append(h('div', { class: 'empty' }, searching ? '没有匹配的任务' : (view === 'done' ? '还没有已完成的任务' : view === 'today' ? '今日清单是空的:把任务拖到左侧「今日」' : '这里还没有任务')));
   if (!searching && view !== 'done') {
     const q = QUADS[view] ? view : 'q2';
     const toList = isListView(view);
-    const input = h('input', { placeholder: '新任务', autocomplete: 'off' });
-    input.addEventListener('keydown', e => {
-      if (e.key !== 'Enter' || e.isComposing) return;
-      const v = input.value.trim();
-      if (!v) return;
+    box.append(addRow(v => {
       const nt = toList ? addTask(null, v, null, view) : addTask(q, v);
       if (view === 'today') nt.today = true;
       pendingFocusAdd = true; save(); render();
-    });
-    box.append(h('div', { class: 'addrow' }, h('span', { class: 'ring' }), input));
+    }));
   }
   return box;
+}
+
+/* ---- sub-list board (columns inside one custom list) ---- */
+function newSection() {
+  if (!lists.some(l => l.id === view)) return;
+  const sec = { id: 'S_' + uid(), kind: 'sec', list: view, name: '新子列表', ord: secs.length, u: Date.now() };
+  secs.push(sec); save();
+  pendingSecEdit = sec.id; render();
+}
+function moveSec(sec, dir) {
+  const mine = secs.filter(x => x.list === sec.list);
+  const other = mine[mine.indexOf(sec) + dir];
+  if (!other) return;
+  const i = secs.indexOf(sec), j = secs.indexOf(other);
+  secs[i] = other; secs[j] = sec;
+  save(); render();
+}
+function removeSec(sec) {
+  tasks.forEach(t => { if (t.sec === sec.id) t.sec = null; });
+  secs = secs.filter(x => x !== sec);
+  save(); render();
+}
+function renderBoard(list) {
+  const mine = secs.filter(x => x.list === view);
+  const board = h('div', { class: 'board' });
+  const base = list.filter(t => !t.sec || !mine.some(x => x.id === t.sec));
+  const cols = [];
+  if (base.length) cols.push({ id: '', name: '未分组', items: base });
+  mine.forEach(x => cols.push({ id: x.id, name: x.name, items: list.filter(t => t.sec === x.id), sec: x }));
+  for (const c of cols) {
+    const col = h('div', { class: 'col', 'data-sec': c.id });
+    const name = h('span', { class: 'coln' }, c.name);
+    const head = h('div', { class: 'col-h' }, name, h('span', { class: 'colct' }, String(c.items.length)));
+    if (c.sec) {
+      const idx = mine.indexOf(c.sec);
+      name.contentEditable = PLAIN ? 'plaintext-only' : 'true';
+      name.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); name.blur(); } });
+      name.addEventListener('blur', () => {
+        const v = name.textContent.trim().slice(0, 60);
+        if (v && v !== c.sec.name) { c.sec.name = v; save(); render(); } else name.textContent = c.sec.name;
+      });
+      head.append(
+        h('button', { class: 'colmv', type: 'button', title: '左移', disabled: idx === 0 ? '' : null, onclick: () => moveSec(c.sec, -1) }, '‹'),
+        h('button', { class: 'colmv', type: 'button', title: '右移', disabled: idx === mine.length - 1 ? '' : null, onclick: () => moveSec(c.sec, 1) }, '›'),
+        h('button', { class: 'colrm', type: 'button', title: '删除子列表(任务移到「未分组」)', onclick: () => removeSec(c.sec) }, '×'));
+    }
+    const body = h('div', { class: 'colbody' });
+    for (const t of c.items) body.append(rowEl(t, false));
+    col.append(head, body, addRow(v => {
+      const nt = addTask(null, v, null, view);
+      nt.sec = c.id || null;
+      pendingFocusAdd = true; pendingFocusSel = `.col[data-sec="${c.id}"] .addrow input`;
+      save(); render();
+    }));
+    board.append(col);
+  }
+  board.append(h('button', { class: 'addcol', type: 'button', onclick: newSection }, '+ 添加子列表'));
+  return board;
 }
 
 
@@ -1035,12 +1161,14 @@ $('title').addEventListener('blur', () => {
   const v = title.textContent.trim().slice(0, 60);
   if (v && v !== lst.name) { lst.name = v; save(); render(); } else title.textContent = lst.name;
 });
+$('addSecBtn').addEventListener('click', newSection);
 $('delListBtn').addEventListener('click', () => {
   const lst = lists.find(l => l.id === view);
   if (!lst) return;
   const n = tasks.filter(t => t.list === lst.id).length;
   if (!confirm(n ? `删除清单「${lst.name}」及其中 ${n} 个任务?此操作不可撤销。` : `删除清单「${lst.name}」?`)) return;
   tasks = tasks.filter(t => t.list !== lst.id);
+  secs = secs.filter(x => x.list !== lst.id);
   lists = lists.filter(l => l !== lst);
   view = 'plane'; save(); render();
 });
@@ -1058,7 +1186,7 @@ $('clearBtn').addEventListener('click', () => {
 });
 
 $('exportBtn').addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify({ version: 2, tasks, lists }, null, 2)], { type: 'application/json' });
+  const blob = new Blob([JSON.stringify({ version: 2, tasks, lists, secs }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `quadrant-board-${new Date().toISOString().slice(0, 10)}.json`;
@@ -1077,7 +1205,8 @@ importFile.addEventListener('change', async () => {
     if (!Array.isArray(arr)) throw 0;
     const clean = arr.map(normalize).filter(Boolean);
     const cleanLists = (Array.isArray(v) ? [] : (v.lists || [])).map(normalizeList).filter(Boolean);
-    if (confirm(`导入 ${clean.length} 个任务、${cleanLists.length} 个清单,将覆盖当前数据,继续?`)) { tasks = clean; lists = cleanLists; view = 'plane'; save(); render(); }
+    const cleanSecs = (Array.isArray(v) ? [] : (v.secs || [])).map(normalizeSec).filter(Boolean);
+    if (confirm(`导入 ${clean.length} 个任务、${cleanLists.length} 个清单,将覆盖当前数据,继续?`)) { tasks = clean; lists = cleanLists; secs = cleanSecs; view = 'plane'; save(); render(); }
   } catch (e) { alert('导入失败:文件格式不正确'); }
 });
 
@@ -1122,16 +1251,17 @@ function applyRows(rows) {
     if (r.updated_at <= lu) { if (r.updated_at < lu) dirty.add(r.id); continue; }
     if (r.deleted) {
       if (local) {
-        if (local.kind === 'list') lists = lists.filter(l => l.id !== r.id); else tasks = tasks.filter(t => t.id !== r.id);
+        tasks = tasks.filter(x => x.id !== r.id); lists = lists.filter(x => x.id !== r.id); secs = secs.filter(x => x.id !== r.id);
         syncSnap.delete(r.id); changed = true;
       }
       tombs = tombs.filter(x => x.id !== r.id); tombs.push({ id: r.id, u: r.updated_at });
     } else {
       const d = r.data || {};
-      const nt = d.kind === 'list' ? normalizeList({ ...d, id: r.id }) : normalize({ ...d, id: r.id });
+      const nt = d.kind === 'list' ? normalizeList({ ...d, id: r.id })
+        : d.kind === 'sec' ? normalizeSec({ ...d, id: r.id }) : normalize({ ...d, id: r.id });
       if (!nt) continue;
       nt.u = r.updated_at;
-      const arr = nt.kind === 'list' ? lists : tasks;
+      const arr = nt.kind === 'list' ? lists : nt.kind === 'sec' ? secs : tasks;
       if (local) arr[arr.indexOf(local)] = nt; else arr.push(nt);
       tombs = tombs.filter(x => x.id !== r.id);
       syncSnap.set(r.id, JSON.stringify(itemContent(nt)));
@@ -1141,7 +1271,7 @@ function applyRows(rows) {
   }
   if (changed) {
     const by = (a, b) => (a.ord ?? 1e9) - (b.ord ?? 1e9) || (a.created || 0) - (b.created || 0);
-    tasks.sort(by); lists.sort(by);
+    tasks.sort(by); lists.sort(by); secs.sort(by);
     persist();
     renderSoon();
   }
